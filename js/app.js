@@ -1,10 +1,18 @@
-const LS_KEY = 'kamishibai_pages_v7';
+// ==================================================
+//  app.js  （縦書き紙芝居エディタ + レイヤー + 手書きモード）
+// ==================================================
 
+const LS_KEY = 'kamishibai_pages_v8';
+
+// 論理座標（レイアウトの基準となる仮想キャンバス）
 const LOGICAL_W = 1080;
 const LOGICAL_H = 720;
+
+// サムネイルサイズ
 const THUMB_W = 200;
 const THUMB_H = 133;
 
+// ===== DOM取得 =====
 const editor = document.getElementById('editor');
 const output = document.getElementById('output');
 const fontSize = document.getElementById('fontSize');
@@ -13,6 +21,7 @@ const counter = document.getElementById('counter');
 const rail = document.getElementById('rail');
 const stage = document.querySelector('.stage');
 
+// ツールバー
 const addOneBtn = document.getElementById('addOne');
 const duplicateBtn = document.getElementById('duplicate');
 const deleteBtn = document.getElementById('delete');
@@ -25,12 +34,8 @@ const importBtn = document.getElementById('import');
 const importFile = document.getElementById('importFile');
 const rasterizeBtn = document.getElementById('rasterize');
 const backToTextBtn = document.getElementById('backToText');
-const imageFile = document.getElementById('imageFile');
 
-const layerList = document.getElementById('layerList');
-const canvasCode = document.getElementById('canvasCode');
-const copyCodeBtn = document.getElementById('copyCode');
-
+// OBJECTツール
 const shapeCircleFillBtn = document.getElementById('shapeCircleFill');
 const shapeCircleRingBtn = document.getElementById('shapeCircleRing');
 const shapeTriangleBtn = document.getElementById('shapeTriangle');
@@ -39,25 +44,44 @@ const shapeFullRectBtn = document.getElementById('shapeFullRect');
 const toolTextBtn = document.getElementById('toolTextBtn');
 const toolTextInput = document.getElementById('toolTextInput');
 
+// カラー
 const colorSwatches = document.querySelectorAll('.color-swatch');
 const customColor = document.getElementById('customColor');
+
+// SNAP
 const snapCenterToggle = document.getElementById('snapCenterToggle');
 
+// DRAW（手書き）
+const drawModeToggle = document.getElementById('drawModeToggle');
+
+// レイヤーパネル / コードパネル
+const layerList = document.getElementById('layerList');
+const canvasCode = document.getElementById('canvasCode');
+const copyCodeBtn = document.getElementById('copyCode');
+
+// 画像挿入
+const imageFile = document.getElementById('imageFile');
+
+// ===== データ構造 =====
 // slides[i] = { text: string, raster: { fontSize:number, layers:[layer...] } | null }
 // layer = {
-//   kind:'char',  ch, logicX, logicY, baseSize, color, locked?
-//   kind:'image', src, logicX, logicY, baseW, baseH, locked?
-//   kind:'shape', type, logicX, logicY, baseW, baseH, text?, fontSize?, color?, locked?
+//   kind:'char',   ch, logicX, logicY, baseSize, color, locked?
+//   kind:'image',  src, logicX, logicY, baseW, baseH, locked?
+//   kind:'shape',  type, logicX, logicY, baseW, baseH, text?, fontSize?, color?, locked?
+//   kind:'stroke', points:[{x,y}...], width, color, locked?
 // }
+
 let slides = [{ text: '文字を視る', raster: null }];
 let idx = 0;
 
-let stageSelected = false;
 let mode = 'text'; // 'text' | 'raster'
+let stageSelected = false;
 
+// ラスタライズ後のオブジェクトを管理
 let charLayer = null;
-let charObjects = []; // { el, data:layer, kind }
+let charObjects = []; // { el, data, kind }
 
+// ドラッグ／リサイズ
 let draggingObj = null;
 let dragStartScreenX = 0;
 let dragStartScreenY = 0;
@@ -69,11 +93,11 @@ let resizingObj = null;
 let resizeStartScreenY = 0;
 let resizeStartSize = 0;
 
-let pendingImagePos = null;
-
+// 選択状態
 let selectedObj = null;
 let selectedSet = [];
 
+// レイヤー並べ替え
 let currentLayerItems = [];
 let dragLayerIndex = null;
 
@@ -82,10 +106,35 @@ let undoStack = [];
 let redoStack = [];
 let isRestoring = false;
 
-// スナップON/OFF
+// 色
+let currentColor = getInkColor();
+
+// スナップ
 let snapCenterEnabled = false;
 
-// ===== 共通ユーティリティ =====
+// 画像挿入（ダブルクリック）
+let pendingImagePos = null;
+
+// 手書きモード用
+let drawMode = false;      // 手書きモードON/OFF
+let drawing = false;       // 線を描いている最中か
+let erasing = false;       // Shift押下中（疑似消しゴム）
+let currentStroke = null;  // 現在の1本の線レイヤー
+
+let drawCanvas = null;     // ステージ上の手書きキャンバス
+let drawCtx = null;
+
+
+// ==================================================
+// 共通ユーティリティ
+// ==================================================
+
+function getInkColor() {
+  return (
+    (getComputedStyle(document.body).getPropertyValue('--ink') || '#111111')
+      .trim() || '#111111'
+  );
+}
 
 function makeSnapshot() {
   return JSON.parse(
@@ -107,11 +156,14 @@ function pushUndoState() {
 
 function restoreFromSnapshot(snap) {
   isRestoring = true;
+
   slides = (snap.slides || []).map(normalizeSlide);
   idx = Math.min(Math.max(0, snap.idx || 0), slides.length - 1);
   if (snap.fontSize) fontSize.value = snap.fontSize;
+
   clearSelectedObj();
   renderStage();
+
   isRestoring = false;
 }
 
@@ -131,16 +183,10 @@ function redo() {
   restoreFromSnapshot(snap);
 }
 
-// ==== 色まわり ====
-function getInkColor() {
-  return (
-    (getComputedStyle(document.body).getPropertyValue('--ink') || '#111111')
-      .trim() || '#111111'
-  );
-}
-let currentColor = getInkColor();
+// ==================================================
+// スライド / ラスタデータの正規化
+// ==================================================
 
-// ==== データモデル ====
 function normalizeSlide(raw) {
   if (typeof raw === 'string') {
     return { text: raw, raster: null };
@@ -162,6 +208,11 @@ function normalizeSlide(raw) {
       if (Array.isArray(r.shapes)) {
         r.shapes.forEach(s => {
           r.layers.push(Object.assign({ kind: 'shape' }, s));
+        });
+      }
+      if (Array.isArray(r.strokes)) {
+        r.strokes.forEach(s => {
+          r.layers.push(Object.assign({ kind: 'stroke' }, s));
         });
       }
     }
@@ -187,7 +238,11 @@ function getRasterItems(raster) {
   return raster && Array.isArray(raster.layers) ? raster.layers : [];
 }
 
-// ==== 選択 ====
+
+// ==================================================
+// 選択処理
+// ==================================================
+
 function updateSelectionStyles() {
   charObjects.forEach(o => {
     if (!o.el) return;
@@ -224,11 +279,14 @@ function clearSelectedObj() {
   updateLayerAndCodeUI();
 }
 
-// ==== レイヤー UI + コード表示 ====
+
+// ==================================================
+// レイヤーパネル & コードパネル
+// ==================================================
+
 function updateLayerAndCodeUI() {
   const page = slides[idx];
   const raster = page.raster;
-
   const snapshot = {
     pageIndex: idx,
     text: page.text,
@@ -243,8 +301,8 @@ function updateLayerAndCodeUI() {
 
   if (!layers.length) {
     const li = document.createElement('li');
-    li.className = 'layer-empty';
-    li.textContent = 'ラスタライズされたレイヤーはありません。';
+    li.className = 'layer-item';
+    li.textContent = 'ラスタライズされたオブジェクトはありません。';
     layerList.appendChild(li);
     return;
   }
@@ -252,11 +310,14 @@ function updateLayerAndCodeUI() {
   currentLayerItems = layers.slice();
 
   const n = layers.length;
-  // 内部配列：先頭が奥、末尾が手前
-  // UI：手前のレイヤー（末尾）を一番上に表示
+  // 内部: 先頭が奥、末尾が手前
+  // UI: 手前（末尾）を一番上に表示
   for (let uiIndex = 0; uiIndex < n; uiIndex++) {
     const layerIndex = n - 1 - uiIndex;
     const entry = layers[layerIndex];
+
+    // 手書きストロークは今回はレイヤー UI には出さない（必要ならここで対応可能）
+    if (entry.kind === 'stroke') continue;
 
     const li = document.createElement('li');
     li.className = 'layer-item';
@@ -295,7 +356,6 @@ function updateLayerAndCodeUI() {
     lockBtn.className = 'layer-lock';
     lockBtn.type = 'button';
     lockBtn.textContent = 'Lock';
-    lockBtn.title = 'ロック切替';
 
     const orderSpan = document.createElement('span');
     orderSpan.className = 'layer-order';
@@ -327,14 +387,13 @@ function updateLayerAndCodeUI() {
     li.appendChild(header);
     li.appendChild(coords);
 
-    // ドラッグ＆ドロップで順序変更
+    // DnD並べ替え
     li.draggable = true;
     li.dataset.layerIndex = layerIndex;
     li.addEventListener('dragstart', handleLayerDragStart);
     li.addEventListener('dragover', handleLayerDragOver);
     li.addEventListener('drop', handleLayerDrop);
 
-    // ロック切替
     lockBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       pushUndoState();
@@ -343,7 +402,7 @@ function updateLayerAndCodeUI() {
       updateLayerAndCodeUI();
     });
 
-    // レイヤークリック → 選択（Shiftで複数）
+    // 名前をクリックしても選択
     li.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -355,6 +414,13 @@ function updateLayerAndCodeUI() {
       }
     });
 
+    layerList.appendChild(li);
+  }
+
+  if (!layerList.children.length) {
+    const li = document.createElement('li');
+    li.className = 'layer-item';
+    li.textContent = '（文字・図形レイヤーはありません）';
     layerList.appendChild(li);
   }
 }
@@ -392,7 +458,10 @@ function applyLayerReorder(newItems) {
   updateLayerAndCodeUI();
 }
 
-// ===== ステージ描画 =====
+
+// ==================================================
+// ステージ描画
+// ==================================================
 
 function renderStage() {
   const page = slides[idx];
@@ -400,7 +469,7 @@ function renderStage() {
   output.style.fontSize = Number(fontSize.value) + 'px';
   editor.value = page.text || '';
   badge.textContent = String(idx + 1).padStart(2, '0');
-  counter.textContent = 'ページ ' + (idx + 1) + ' / ' + slides.length;
+  counter.textContent = `ページ ${idx + 1} / ${slides.length}`;
 
   clearCharLayer();
 
@@ -419,7 +488,7 @@ function renderStage() {
   updateLayerAndCodeUI();
 }
 
-// ==== サムネイル用図形描画（ステージと同じスケールロジック） ====
+// サムネイル用：図形描画（ステージと同等のスケールロジック）
 function drawShapeOnCtx(ctx, shape, scale, offsetX, offsetY) {
   const baseColor = shape.color || getInkColor();
 
@@ -490,7 +559,6 @@ function renderRail() {
       ctx.fillStyle = '#d6d6d6';
       ctx.fillRect(0, 0, THUMB_W, THUMB_H);
 
-      // ステージと同じロジック：等倍スケール + レターボックス
       const scaleX = THUMB_W / LOGICAL_W;
       const scaleY = THUMB_H / LOGICAL_H;
       const scale = Math.min(scaleX, scaleY);
@@ -520,6 +588,23 @@ function renderRail() {
           };
         } else if (layer.kind === 'shape') {
           drawShapeOnCtx(ctx, layer, scale, offsetX, offsetY);
+        } else if (layer.kind === 'stroke') {
+          const pts = layer.points || [];
+          if (pts.length > 1) {
+            const widthPx = (layer.width || 4) * scale;
+            ctx.strokeStyle = layer.color || getInkColor();
+            ctx.lineWidth = widthPx;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            pts.forEach((pt, idx) => {
+              const sx = offsetX + pt.x * scale;
+              const sy = offsetY + pt.y * scale;
+              if (idx === 0) ctx.moveTo(sx, sy);
+              else ctx.lineTo(sx, sy);
+            });
+            ctx.stroke();
+          }
         }
       });
 
@@ -548,7 +633,10 @@ function renderRail() {
   });
 }
 
-// ===== ページ操作 =====
+
+// ==================================================
+// ページ操作
+// ==================================================
 
 function addOne() {
   commitInline();
@@ -605,7 +693,10 @@ function prev() {
   renderStage();
 }
 
-// ===== 保存 / 読込 =====
+
+// ==================================================
+// 保存 / 読み込み
+// ==================================================
 
 function persist() {
   localStorage.setItem(
@@ -637,7 +728,10 @@ function load() {
   }
 }
 
-// ===== テキスト編集 =====
+
+// ==================================================
+// テキスト編集
+// ==================================================
 
 function placeCaretAtEnd(el) {
   const range = document.createRange();
@@ -684,7 +778,10 @@ stage.addEventListener('click', e => {
   stageSelected = true;
 });
 
-// ===== ラスタレイヤ =====
+
+// ==================================================
+// ラスタライズレイヤー（テキスト→オブジェクト）
+// ==================================================
 
 function clearCharLayer() {
   if (charLayer) {
@@ -695,27 +792,38 @@ function clearCharLayer() {
   draggingObj = null;
   resizingObj = null;
   clearSelectedObj();
+
+  // 手書きキャンバスは残す（modeがtextなら後でhide）
 }
 
 function exitRasterMode() {
   mode = 'text';
   clearCharLayer();
   output.style.visibility = 'visible';
+
+  // 手書きキャンバスも見えなくする
+  if (drawCanvas && drawCtx) {
+    drawCanvas.style.pointerEvents = 'none';
+    drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+  }
   updateLayerAndCodeUI();
 }
 
-// ★ 等倍率スケール＋中央揃え
-function updateSpritePositions() {
-  if (mode !== 'raster' || !charLayer || charObjects.length === 0) return;
-
+// ステージの論理→画面変換情報
+function getStageTransform() {
   const rect = stage.getBoundingClientRect();
-
   const scaleX = rect.width / LOGICAL_W;
   const scaleY = rect.height / LOGICAL_H;
   const scale = Math.min(scaleX, scaleY);
-
   const offsetX = (rect.width - LOGICAL_W * scale) / 2;
   const offsetY = (rect.height - LOGICAL_H * scale) / 2;
+  return { rect, scale, offsetX, offsetY };
+}
+
+function updateSpritePositions() {
+  if (mode !== 'raster' || !charLayer || charObjects.length === 0) return;
+
+  const { scale, offsetX, offsetY } = getStageTransform();
 
   charObjects.forEach(obj => {
     const d = obj.data;
@@ -724,24 +832,24 @@ function updateSpritePositions() {
     const cx = offsetX + d.logicX * scale;
     const cy = offsetY + d.logicY * scale;
 
-    obj.el.style.left = cx + 'px';
-    obj.el.style.top = cy + 'px';
+    obj.el.style.left = `${cx}px`;
+    obj.el.style.top = `${cy}px`;
 
     if (obj.kind === 'char') {
       const w = d.baseSize * scale;
       const h = d.baseSize * scale;
-      obj.el.style.width = w + 'px';
-      obj.el.style.height = h + 'px';
+      obj.el.style.width = `${w}px`;
+      obj.el.style.height = `${h}px`;
     } else if (obj.kind === 'image' || obj.kind === 'shape') {
       const w = (d.baseW || 0) * scale;
       const h = (d.baseH || 0) * scale;
-      obj.el.style.width = w + 'px';
-      obj.el.style.height = h + 'px';
+      obj.el.style.width = `${w}px`;
+      obj.el.style.height = `${h}px`;
     }
   });
 }
 
-// 高解像度文字
+// 高解像度文字画像
 function createCharImage(data) {
   const SCALE = 3;
   const dpr = (window.devicePixelRatio || 1) * SCALE;
@@ -774,7 +882,7 @@ function createCharImage(data) {
   return img;
 }
 
-// 高解像度図形（ステージ側用）
+// 高解像度図形画像（ステージ表示用）
 function createShapeImage(shape) {
   const SCALE = 3;
   const dpr = (window.devicePixelRatio || 1) * SCALE;
@@ -834,8 +942,8 @@ function createShapeImage(shape) {
   const img = new Image();
   img.src = canvas.toDataURL('image/png');
   img.className = 'char-sprite';
-  img.style.width = w + 'px';
-  img.style.height = h + 'px';
+  img.style.width = `${w}px`;
+  img.style.height = `${h}px`;
   return img;
 }
 
@@ -846,16 +954,15 @@ function addSpriteEventHandlers(img, obj) {
     e.preventDefault();
     stageSelected = true;
 
-    // ロック中は選択だけ許可
     if (obj.data && obj.data.locked) {
       setSelectedObj(obj, e.shiftKey);
       return;
     }
 
-    // 操作前にUndoスナップショット
+    // 操作開始時にUndoスナップ
     pushUndoState();
 
-    // Shiftで複数選択
+    // 複数選択（Shift）
     setSelectedObj(obj, e.shiftKey);
 
     if (sizeEditMode) {
@@ -881,12 +988,11 @@ function buildCharLayerFromRaster(raster) {
 
   const layerEl = document.createElement('div');
   layerEl.className = 'char-layer';
-  layerEl.style.left = '0px';
-  layerEl.style.top = '0px';
 
   const layers = getRasterItems(raster);
 
   layers.forEach(layer => {
+    if (layer.kind === 'stroke') return; // ストロークはdrawCanvasに描画
     let img;
     if (layer.kind === 'char') {
       img = createCharImage(layer);
@@ -913,11 +1019,17 @@ function buildCharLayerFromRaster(raster) {
   mode = 'raster';
   output.style.visibility = 'hidden';
   updateSpritePositions();
+
+  // 手書きキャンバスもセットアップ
+  setupDrawCanvas();
+
   updateLayerAndCodeUI();
 }
 
 function enterRasterMode() {
-  if (mode === 'raster' && slides[idx].raster && getRasterItems(slides[idx].raster).length) return;
+  if (mode === 'raster' && slides[idx].raster && getRasterItems(slides[idx].raster).length) {
+    return;
+  }
 
   commitInline();
   const page = slides[idx];
@@ -988,7 +1100,10 @@ function enterRasterMode() {
   renderRail();
 }
 
-// ===== 画像挿入 =====
+
+// ==================================================
+// 画像挿入（ダブルクリック）
+// ==================================================
 
 function insertImageAt(logicX, logicY, dataUrl) {
   pushUndoState();
@@ -1022,8 +1137,8 @@ function insertImageAt(logicX, logicY, dataUrl) {
       const img = new Image();
       img.src = layer.src;
       img.className = 'char-sprite';
-      img.style.width = layer.baseW + 'px';
-      img.style.height = layer.baseH + 'px';
+      img.style.width = `${layer.baseW}px`;
+      img.style.height = `${layer.baseH}px`;
       const obj = { el: img, data: layer, kind: 'image' };
       charObjects.push(obj);
       img._charObj = obj;
@@ -1038,7 +1153,10 @@ function insertImageAt(logicX, logicY, dataUrl) {
   tmpImg.src = dataUrl;
 }
 
-// ===== 図形・テキスト追加 =====
+
+// ==================================================
+// 図形 & テキストオブジェクト追加
+// ==================================================
 
 function addShape(type) {
   pushUndoState();
@@ -1048,7 +1166,8 @@ function addShape(type) {
 
   let baseW = 220;
   let baseH = 220;
-  let logicX, logicY;
+  let logicX;
+  let logicY;
 
   if (type === 'fullrect') {
     baseW = LOGICAL_W;
@@ -1114,6 +1233,7 @@ function addTextboxFromTool() {
   updateLayerAndCodeUI();
 }
 
+// 選択中の textbox を一文字ずつ char にバラす
 function rasterizeSelectedTextbox() {
   const tbObj = selectedSet.length === 1 ? selectedSet[0] : null;
   if (!tbObj || tbObj.kind !== 'shape' || tbObj.data.type !== 'textbox') return false;
@@ -1159,7 +1279,10 @@ function rasterizeSelectedTextbox() {
   return true;
 }
 
-// ===== 色変更 =====
+
+// ==================================================
+// 色変更
+// ==================================================
 
 function applyColorToSelected(color) {
   if (!selectedSet.length) return;
@@ -1187,9 +1310,7 @@ function applyColorToSelected(color) {
     }
   });
 
-  // 新しい <img> にも論理座標から left/top を再適用
   updateSpritePositions();
-
   persist();
   renderRail();
   updateLayerAndCodeUI();
@@ -1208,12 +1329,16 @@ function setCurrentColor(color) {
     }
   });
   customColor.value = color;
+
   if (selectedSet.length) {
     applyColorToSelected(color);
   }
 }
 
-// ===== スナップ処理（中央 ＋ オブジェクト同士） =====
+
+// ==================================================
+// スナップ処理（中央 ＋ オブジェクト同士）
+// ==================================================
 
 function snapSelectedToCenter() {
   if (!snapCenterEnabled) return;
@@ -1228,7 +1353,7 @@ function snapSelectedToCenter() {
 
   let snapped = false;
 
-  // 1) 中央スナップ
+  // 中央スナップ
   selectedSet.forEach(obj => {
     const d = obj.data;
     if (!d || d.locked) return;
@@ -1244,7 +1369,7 @@ function snapSelectedToCenter() {
     }
   });
 
-  // 2) オブジェクト同士のスナップ
+  // オブジェクト同士
   selectedSet.forEach(obj => {
     const d = obj.data;
     if (!d || d.locked) return;
@@ -1274,12 +1399,151 @@ function snapSelectedToCenter() {
   }
 }
 
-// ===== マウス操作（移動＆サイズ変更） =====
+
+// ==================================================
+// 手書きモード（DRAW）
+// ==================================================
+
+// ステージ上のロジカル座標へ変換
+function screenToLogical(clientX, clientY) {
+  const { rect, scale, offsetX, offsetY } = getStageTransform();
+  const sx = clientX - rect.left;
+  const sy = clientY - rect.top;
+  const lx = (sx - offsetX) / scale;
+  const ly = (sy - offsetY) / scale;
+  return { lx, ly };
+}
+
+// 手書き用キャンバスの準備
+function setupDrawCanvas() {
+  if (!stage) return;
+
+  if (!drawCanvas) {
+    drawCanvas = document.createElement('canvas');
+    drawCanvas.className = 'draw-canvas';
+    drawCanvas.style.pointerEvents = drawMode ? 'auto' : 'none';
+    stage.appendChild(drawCanvas);
+
+    drawCtx = drawCanvas.getContext('2d');
+    drawCtx.lineCap = 'round';
+    drawCtx.lineJoin = 'round';
+
+    drawCanvas.addEventListener('mousedown', onDrawMouseDown);
+  }
+
+  const { rect } = getStageTransform();
+  drawCanvas.width = rect.width;
+  drawCanvas.height = rect.height;
+
+  redrawStrokes();
+}
+
+// ステージリサイズ時などに再描画
+function resizeAndRedrawDrawCanvas() {
+  if (!drawCanvas || !drawCtx || mode !== 'raster') return;
+  const { rect } = getStageTransform();
+  drawCanvas.width = rect.width;
+  drawCanvas.height = rect.height;
+  redrawStrokes();
+}
+
+// ラスターデータにある stroke を画面に描き直す
+function redrawStrokes() {
+  if (!drawCanvas || !drawCtx) return;
+
+  const page = slides[idx];
+  const raster = page.raster;
+  const layers = raster ? getRasterItems(raster) : [];
+
+  const strokes = layers.filter(l => l.kind === 'stroke');
+
+  const { rect, scale, offsetX, offsetY } = getStageTransform();
+  drawCanvas.width = rect.width;
+  drawCanvas.height = rect.height;
+
+  drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+  drawCtx.lineCap = 'round';
+  drawCtx.lineJoin = 'round';
+
+  strokes.forEach(stroke => {
+    if (!stroke.points || stroke.points.length < 2) return;
+
+    const widthPx = (stroke.width || 4) * scale;
+    drawCtx.strokeStyle = stroke.color || getInkColor();
+    drawCtx.lineWidth = widthPx;
+
+    drawCtx.beginPath();
+    stroke.points.forEach((pt, idx) => {
+      const sx = offsetX + pt.x * scale;
+      const sy = offsetY + pt.y * scale;
+      if (idx === 0) drawCtx.moveTo(sx, sy);
+      else drawCtx.lineTo(sx, sy);
+    });
+    drawCtx.stroke();
+  });
+}
+
+function onDrawMouseDown(e) {
+  if (!drawMode || mode !== 'raster') return;
+  e.preventDefault();
+
+  const page = slides[idx];
+  const raster = ensureRaster(page);
+
+  const { lx, ly } = screenToLogical(e.clientX, e.clientY);
+
+  pushUndoState();
+
+  drawing = true;
+  erasing = e.shiftKey;
+
+  // 消しゴムっぽく見せるため背景色で上塗り
+  const bgColor = '#d6d6d6'; // ステージ背景色に合わせる
+  const color = erasing ? bgColor : currentColor;
+  const strokeWidth = 4; // 論理座標上の太さ
+
+  currentStroke = {
+    kind: 'stroke',
+    points: [{ x: lx, y: ly }],
+    width: strokeWidth,
+    color,
+    locked: false
+  };
+
+  raster.layers.push(currentStroke);
+  persist();
+  redrawStrokes();
+}
+
+
+// ==================================================
+// マウス操作（移動 / サイズ変更 / 手書き）
+// ==================================================
 
 document.addEventListener('mousemove', e => {
+  // 手書き中
+  if (drawing && drawMode && mode === 'raster' && drawCanvas && drawCtx) {
+    const { lx, ly } = screenToLogical(e.clientX, e.clientY);
+
+    if (currentStroke) {
+      const pts = currentStroke.points;
+      const last = pts[pts.length - 1];
+      const dx = lx - last.x;
+      const dy = ly - last.y;
+      const dist2 = dx * dx + dy * dy;
+
+      if (dist2 > 0.5 * 0.5) {
+        pts.push({ x: lx, y: ly });
+        redrawStrokes();
+      }
+    }
+    return; // 他のドラッグ処理はしない
+  }
+
+  // サイズ変更
   if (resizingObj && mode === 'raster') {
     const dy = e.clientY - resizeStartScreenY;
-    const factor = 1 - (dy / 200);
+    const factor = 1 - dy / 200;
     let newSize = resizeStartSize * factor;
     newSize = Math.max(16, Math.min(800, newSize));
 
@@ -1298,8 +1562,8 @@ document.addEventListener('mousemove', e => {
       d.baseH = newSize * ratio;
       const oldEl = resizingObj.el;
       if (resizingObj.kind === 'image') {
-        resizingObj.el.style.width = d.baseW + 'px';
-        resizingObj.el.style.height = d.baseH + 'px';
+        resizingObj.el.style.width = `${d.baseW}px`;
+        resizingObj.el.style.height = `${d.baseH}px`;
       } else {
         const newImg = createShapeImage(d);
         resizingObj.el = newImg;
@@ -1310,15 +1574,14 @@ document.addEventListener('mousemove', e => {
     }
 
     updateSpritePositions();
-    // リサイズ中もサムネイルとレイヤ情報を更新
     renderRail();
     updateLayerAndCodeUI();
-
     return;
   }
 
+  // オブジェクト移動
   if (!draggingObj || mode !== 'raster') return;
-  const rect = stage.getBoundingClientRect();
+  const { rect } = getStageTransform();
   const scaleX = rect.width / LOGICAL_W;
   const scaleY = rect.height / LOGICAL_H;
 
@@ -1335,6 +1598,16 @@ document.addEventListener('mousemove', e => {
 });
 
 document.addEventListener('mouseup', () => {
+  // 手書き終了
+  if (drawing && drawMode) {
+    drawing = false;
+    currentStroke = null;
+    persist();
+    renderRail();
+    updateLayerAndCodeUI();
+  }
+
+  // 移動 / リサイズ終了
   if (draggingObj || resizingObj) {
     if (snapCenterEnabled && mode === 'raster' && selectedSet.length) {
       snapSelectedToCenter();
@@ -1347,20 +1620,24 @@ document.addEventListener('mouseup', () => {
   }
 });
 
-// ===== ダブルクリックで画像挿入 =====
+
+// ==================================================
+// ダブルクリックで画像挿入
+// ==================================================
 
 stage.addEventListener('dblclick', e => {
   if (e.target !== stage) return;
   if (mode !== 'raster') enterRasterMode();
 
-  const rect = stage.getBoundingClientRect();
+  const { rect } = getStageTransform();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
 
-  const logicX = (x / rect.width) * LOGICAL_W;
-  const logicY = (y / rect.height) * LOGICAL_H;
+  const { scale, offsetX, offsetY } = getStageTransform();
+  const lx = (x - offsetX) / scale;
+  const ly = (y - offsetY) / scale;
 
-  pendingImagePos = { logicX, logicY };
+  pendingImagePos = { logicX: lx, logicY: ly };
   imageFile.value = '';
   imageFile.click();
 });
@@ -1380,7 +1657,10 @@ imageFile.addEventListener('change', e => {
   reader.readAsDataURL(file);
 });
 
-// ===== コードコピー / 書き出し / 読み込み =====
+
+// ==================================================
+// コードのコピー / JSON書き出し / 読み込み
+// ==================================================
 
 copyCodeBtn.addEventListener('click', () => {
   const text = canvasCode.value || '';
@@ -1440,7 +1720,10 @@ importFile.addEventListener('change', async e => {
   }
 });
 
-// ===== ボタンイベント =====
+
+// ==================================================
+// ボタンイベント
+// ==================================================
 
 addOneBtn.addEventListener('click', addOne);
 duplicateBtn.addEventListener('click', duplicate);
@@ -1477,6 +1760,7 @@ editor.addEventListener('keydown', e => {
   }
 });
 
+// 図形ツール
 shapeCircleFillBtn.addEventListener('click', () => {
   enterRasterMode();
   addShape('circleFill');
@@ -1498,34 +1782,56 @@ shapeFullRectBtn.addEventListener('click', () => {
   addShape('fullrect');
 });
 
+// テキストツール
 toolTextBtn.addEventListener('click', () => {
   enterRasterMode();
   addTextboxFromTool();
 });
 
-// カラーパレット
+// カラー
 colorSwatches.forEach(btn => {
   btn.addEventListener('click', () => {
     setCurrentColor(btn.dataset.color);
   });
 });
+
 customColor.addEventListener('input', e => {
   setCurrentColor(e.target.value);
 });
 
-// スナップON/OFF
+// SNAP
 snapCenterToggle.addEventListener('change', (e) => {
   snapCenterEnabled = e.target.checked;
 });
 
-// ===== キー操作 =====
+// DRAW （手書きモード）
+drawModeToggle.addEventListener('change', (e) => {
+  drawMode = e.target.checked;
+
+  if (!drawCanvas && drawMode) {
+    setupDrawCanvas();
+  }
+  if (drawCanvas) {
+    drawCanvas.style.pointerEvents = drawMode ? 'auto' : 'none';
+  }
+
+  if (!drawMode) {
+    drawing = false;
+    currentStroke = null;
+  }
+});
+
+
+// ==================================================
+// キーボードショートカット
+// ==================================================
 
 window.addEventListener('keydown', e => {
   const tag = (document.activeElement?.tagName || '').toLowerCase();
   const isEditable = document.activeElement?.isContentEditable;
   const isInput = tag === 'input' || tag === 'textarea';
 
-  // Ctrl+Z / Ctrl+Shift+Z / Cmd系
+  // Undo / Redo
   if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'z' || e.key === 'Z')) {
     e.preventDefault();
     if (e.shiftKey) {
@@ -1536,7 +1842,7 @@ window.addEventListener('keydown', e => {
     return;
   }
 
-  // S : サイズ編集モード切り替え
+  // S: サイズ編集モード切り替え
   if ((e.key === 's' || e.key === 'S') && !isInput && !isEditable && document.activeElement !== toolTextInput) {
     e.preventDefault();
     sizeEditMode = !sizeEditMode;
@@ -1546,7 +1852,7 @@ window.addEventListener('keydown', e => {
     return;
   }
 
-  // Enter : キャンバスクリック後 → テキスト編集
+  // Enter: キャンバスクリック後 → テキスト編集
   if (e.key === 'Enter' && stageSelected && !output.isContentEditable && !isInput && !isEditable) {
     e.preventDefault();
     if (mode === 'raster') {
@@ -1556,7 +1862,7 @@ window.addEventListener('keydown', e => {
     return;
   }
 
-  // Backspace / Delete : オブジェクト削除 or ページ削除
+  // Delete / Backspace: オブジェクト削除 or ページ削除
   if ((e.key === 'Delete' || e.key === 'Backspace') && !isEditable && !isInput) {
     e.preventDefault();
     if (selectedSet.length && mode === 'raster') {
@@ -1592,31 +1898,47 @@ window.addEventListener('keydown', e => {
 
   if (e.key === 'ArrowRight' || e.key === 'PageDown') next();
   if (e.key === 'ArrowLeft' || e.key === 'PageUp') prev();
+
   if (e.key === 'f' || e.key === 'F') {
     e.preventDefault();
     toggleFullscreen();
   }
 });
 
-// ===== フルスクリーン =====
+
+// ==================================================
+// フルスクリーン
+// ==================================================
 
 function toggleFullscreen() {
   if (!document.fullscreenElement) {
     if (stage && stage.requestFullscreen) {
-      stage.requestFullscreen({ navigationUI: 'hide' }).catch(() => { });
+      stage.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
     }
   } else {
     if (document.exitFullscreen) {
-      document.exitFullscreen().catch(() => { });
+      document.exitFullscreen().catch(() => {});
     }
   }
 }
 
-window.addEventListener('resize', updateSpritePositions);
-document.addEventListener('fullscreenchange', updateSpritePositions);
-document.addEventListener('webkitfullscreenchange', updateSpritePositions);
+window.addEventListener('resize', () => {
+  updateSpritePositions();
+  resizeAndRedrawDrawCanvas();
+});
+document.addEventListener('fullscreenchange', () => {
+  updateSpritePositions();
+  resizeAndRedrawDrawCanvas();
+});
+document.addEventListener('webkitfullscreenchange', () => {
+  updateSpritePositions();
+  resizeAndRedrawDrawCanvas();
+});
 
-// ===== パネルドラッグ処理 =====
+
+// ==================================================
+// パネルをドラッグ可能にする
+// ==================================================
 
 function makePanelDraggable(panel) {
   if (!panel) return;
@@ -1634,7 +1956,7 @@ function makePanelDraggable(panel) {
     offsetY = e.clientY - rect.top;
     handle.style.cursor = 'grabbing';
 
-    // bottom固定が残っていると縦に伸びるので解除
+    // bottom固定があると縦に伸びるので解除
     panel.style.bottom = 'auto';
 
     e.preventDefault();
@@ -1652,9 +1974,14 @@ function makePanelDraggable(panel) {
   });
 }
 
-// ===== 初期化 =====
 
-if (!load()) renderStage();
+// ==================================================
+// 初期化
+// ==================================================
+
+if (!load()) {
+  renderStage();
+}
 
 // パネルをドラッグ可能に
 makePanelDraggable(document.getElementById('objectPanel'));

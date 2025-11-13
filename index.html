@@ -3,85 +3,82 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>縦書き 紙芝居エディタ（ラスタ＆レイヤー付き）</title>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@500&display=swap" rel="stylesheet">
+  <title>縦書き 紙芝居エディタ（ページ対応）</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-  <!-- ===== 上部ツールバー ===== -->
+  <!-- ===== ヘッダー / ツールバー ===== -->
   <header>
     <div class="toolbar">
       <div class="row">
-        <!-- 画面上には出さないが内部的に使うエディタ -->
-        <textarea id="editor" style="display:none;"></textarea>
-
         <label class="font-label">
           文字サイズ
           <input id="fontSize" type="number" min="12" max="200" value="64" />
           <span>px</span>
         </label>
-
+        <button id="rasterize">ラスタライズ</button>
+        <button id="backToText">テキストに戻す</button>
+        <span id="counter" class="page-counter"></span>
+      </div>
+      <div class="row">
         <button id="addOne">+ 1ページ追加</button>
         <button id="duplicate">ページを複製</button>
         <button id="delete">ページを削除</button>
         <button id="prev">◀ 前へ</button>
         <button id="next">次へ ▶</button>
-        <button id="rasterize">ラスタライズ</button>
-        <button id="backToText">テキストに戻す</button>
         <button id="save">保存</button>
         <button id="load">読込</button>
         <button id="export">書き出し</button>
         <button id="import">読み込み</button>
-        <span id="counter" class="page-counter"></span>
+        <input id="importFile" type="file" accept="application/json" style="display:none" />
       </div>
     </div>
   </header>
 
-  <!-- JSONインポート用（非表示） -->
-  <input id="importFile" type="file" accept="application/json" style="display:none" />
-  <!-- 画像インポート用（非表示） -->
-  <input id="imageFile" type="file" accept="image/*" style="display:none" />
+  <!-- 表に出さないテキストエディタ（既存ロジック保持用） -->
+  <textarea id="editor" style="position:absolute; left:-9999px; top:-9999px;"></textarea>
 
   <!-- ===== メインステージ ===== -->
   <main>
     <div class="stage">
       <div id="output" class="text">文字を視る</div>
       <div class="badge" id="badge">01</div>
-      <!-- char-layer は JS 側で追加される -->
+      <!-- ラスタライズレイヤーと手書きキャンバスは JS で追加 -->
     </div>
   </main>
 
-  <!-- ===== サムネイル（ページ一覧） ===== -->
+  <!-- ===== サムネイル ===== -->
   <div class="railWrap">
     <div id="rail" class="rail" aria-label="ページ一覧"></div>
   </div>
 
-  <!-- ===== オブジェクトパネル（左） ===== -->
+  <!-- ===== OBJECT パネル（左） ===== -->
   <aside id="objectPanel" class="object-panel">
     <div class="panel-drag-handle">OBJECTS</div>
 
-    <!-- 図形＆テキストツール -->
+    <!-- 図形 / テキストツール -->
     <div class="object-panel-section">
       <div class="object-panel-title">TOOLS</div>
       <div class="object-tool-row">
-        <button id="shapeCircleFill" class="object-tool-btn" title="塗り丸">●</button>
-        <button id="shapeCircleRing" class="object-tool-btn" title="線だけの丸">○</button>
-        <button id="shapeTriangle" class="object-tool-btn" title="三角">▲</button>
-        <button id="shapeSquare" class="object-tool-btn" title="正方形">■</button>
-        <button id="shapeFullRect" class="object-tool-btn" title="全面長方形">▭</button>
+        <button id="shapeCircleFill" class="object-tool-btn" type="button">●</button>
+        <button id="shapeCircleRing" class="object-tool-btn" type="button">○</button>
+        <button id="shapeTriangle" class="object-tool-btn" type="button">▲</button>
+        <button id="shapeSquare" class="object-tool-btn" type="button">■</button>
+        <button id="shapeFullRect" class="object-tool-btn" type="button">▭</button>
       </div>
       <div class="object-tool-row">
-        <button id="toolTextBtn" class="object-tool-btn" title="テキスト">T</button>
+        <button id="toolTextBtn" class="object-tool-btn" type="button">T</button>
         <input
           id="toolTextInput"
+          class="object-text-input"
           type="text"
           placeholder="テキスト"
-          class="object-text-input"
         />
       </div>
       <p class="object-hint">
-        Tを押すとテキストボックスを追加できます。<br>
-        Sキーでサイズ編集モードのON/OFF。
+        Tを押すとテキストオブジェクトを追加します。<br />
+        Sキーでサイズ編集モードのON/OFFを切り替えできます。
       </p>
     </div>
 
@@ -89,29 +86,45 @@
     <div class="object-panel-section">
       <div class="object-panel-title">COLOR</div>
       <div class="color-palette">
-        <button class="color-swatch active" data-color="#111111" style="background:#111111;"></button>
-        <button class="color-swatch" data-color="#e53935" style="background:#e53935;"></button>
-        <button class="color-swatch" data-color="#1565c0" style="background:#1565c0;"></button>
-        <button class="color-swatch" data-color="#fbc02d" style="background:#fbc02d;"></button>
-        <button class="color-swatch" data-color="#8e24aa" style="background:#8e24aa;"></button>
-        <button class="color-swatch" data-color="#00897b" style="background:#00897b;"></button>
+        <button class="color-swatch active" type="button" data-color="#111111" style="background:#111111;"></button>
+        <button class="color-swatch" type="button" data-color="#e53935" style="background:#e53935;"></button>
+        <button class="color-swatch" type="button" data-color="#1e88e5" style="background:#1e88e5;"></button>
+        <button class="color-swatch" type="button" data-color="#fdd835" style="background:#fdd835;"></button>
+        <button class="color-swatch" type="button" data-color="#8e24aa" style="background:#8e24aa;"></button>
+        <button class="color-swatch" type="button" data-color="#43a047" style="background:#43a047;"></button>
+        <button class="color-swatch" type="button" data-color="#ffffff" style="background:#ffffff;"></button>
       </div>
       <div class="color-custom-row">
         <span>Custom</span>
         <input id="customColor" type="color" value="#111111" />
       </div>
+      <p class="object-hint">
+        オブジェクトを選択してから色を変更すると、そのオブジェクトの色が変わります。
+      </p>
     </div>
 
-    <!-- SNAP（スナップ機能） -->
+    <!-- DRAW（手書きモード） -->
+    <div class="object-panel-section">
+      <div class="object-panel-title">DRAW</div>
+      <label class="draw-toggle">
+        <input type="checkbox" id="drawModeToggle" />
+        <span>手書きモード</span>
+      </label>
+      <p class="draw-hint">
+        手書きモード中：マウスドラッグで線を描画 / Shift + ドラッグで消しゴム風（背景色で上書き）。
+      </p>
+    </div>
+
+    <!-- SNAP -->
     <div class="object-panel-section">
       <div class="object-panel-title">SNAP</div>
       <label class="snap-toggle">
         <input type="checkbox" id="snapCenterToggle" />
-        <span>中央スナップ</span>
+        <span>中央＆他オブジェクトにスナップ</span>
       </label>
       <p class="snap-hint">
-        ON のとき、キャンバス中央付近や他のオブジェクトの<br>
-        中心付近で離すと、ぴったり揃います。
+        オブジェクトをドラッグしたとき、キャンバス中央や他のオブジェクトの中心に近づくと、
+        自動的に位置がそろいます。
       </p>
     </div>
   </aside>
@@ -122,19 +135,20 @@
     <ul id="layerList" class="layer-list"></ul>
   </aside>
 
-  <!-- ===== コードパネル（右下） ===== -->
+  <!-- ===== CANVAS CODE パネル（右下） ===== -->
   <aside id="panelCode" class="code-panel">
     <div class="panel-drag-handle">CANVAS CODE</div>
     <textarea id="canvasCode" class="code-textarea" readonly></textarea>
-    <button id="copyCode" class="copy-code-btn">コードをコピー</button>
+    <button id="copyCode" class="copy-code-btn" type="button">コードをコピー</button>
   </aside>
 
-  <!-- ===== フッター ===== -->
+  <!-- 画像挿入用（ダブルクリック時に開く） -->
+  <input id="imageFile" type="file" accept="image/*" style="display:none" />
+
   <footer>
-    サムネイルクリックでページジャンプ / キャンバスをクリックして Enter でテキスト編集開始 /
-    ←→ でページ送り / <strong>Fでページだけフルスクリーン</strong> /
-    <strong>Sでサイズ編集モード</strong> /
-    <strong>Ctrl+Z / Ctrl+Shift+Z = Undo / Redo</strong>
+    サムネイルクリックでページジャンプ / ←→ でページ送り /
+    <strong>Fでページだけフルスクリーン</strong> / Sでサイズ編集モード /
+    Ctrl+Z / Ctrl+Shift+Z でUndo/Redo
   </footer>
 
   <script src="js/app.js"></script>
