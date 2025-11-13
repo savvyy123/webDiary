@@ -3,241 +3,140 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>縦書き 紙芝居エディタ（ページ対応）</title>
+  <title>縦書き 紙芝居エディタ（ラスタ＆レイヤー付き）</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@500&display=swap" rel="stylesheet">
-  <style>
-    :root { --bg:#e9e9e9; --ink:#111; --stage-w:1080px; --stage-h:720px; }
-    *{ box-sizing:border-box; }
-    html,body{ height:100%; }
-    body {
-      margin: 0; background-color: var(--bg); color:var(--ink);
-      display: grid; grid-template-rows: auto 1fr auto; gap: 12px;
-      font-family: 'Noto Sans JP', system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Yu Gothic', sans-serif;
-    }
-
-    header{
-      position:sticky; top:0; z-index:10;
-      backdrop-filter: blur(6px);
-      background: #ffffffc8;
-      border-bottom:1px solid #0002;
-    }
-    .toolbar{ max-width:1200px; margin:0 auto; padding:12px 16px; display:grid; gap:8px; }
-    .row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    textarea{
-      flex:1 1 520px; min-height:72px; max-height:40vh; resize:vertical;
-      padding:10px 12px; border-radius:12px; border:1px solid #0002; background:#fff;
-      font-size:16px; line-height:1.5;
-    }
-    button, input[type="number"]{
-      appearance:none; border:1px solid #0002; background:#fff; color:var(--ink);
-      padding:10px 14px; border-radius:12px; cursor:pointer; font-weight:600;
-    }
-    button:hover{ background:#f7f7f7; }
-
-    main{ display:grid; place-items:center; padding:8px 16px 0; }
-    .stage{
-      width:var(--stage-w); height:var(--stage-h); background:#d6d6d6; border-radius:24px;
-      box-shadow:0 8px 28px #0000001a, inset 0 0 0 1px #0002;
-      display:flex; justify-content:center; align-items:flex-start;
-      padding-top:24px; overflow:hidden; position:relative;
-    }
-    .text{
-      writing-mode: vertical-rl; text-orientation: mixed;
-      font-size:64px; line-height:1.35; text-align:center; white-space:pre-wrap;
-      user-select:text; padding:10px; border-radius:12px; max-width:88%; max-height:88%;
-      align-self:flex-start; margin:0;
-    }
-    .text.editing{ outline:2px dashed #0006; background:#fff6; }
-    .badge{ position:absolute; bottom:10px; right:12px; font-size:12px; opacity:.6; background:#fff; padding:4px 8px; border-radius:999px; border:1px solid #0002; }
-
-    .railWrap{ max-width:min(1400px, calc(100vw - 16px)); margin:16px auto 24px; padding:0 8px; }
-    .rail{ display:flex; gap:10px; overflow-x:auto; padding:8px; scroll-snap-type:x proximity; }
-    .thumb{ flex:0 0 auto; width:200px; height:133px; border-radius:12px; background:#d6d6d6; border:1px solid #0002; display:flex; justify-content:center; align-items:flex-start; padding-top:10px; position:relative; cursor:pointer; }
-    .thumb .ttext{ writing-mode: vertical-rl; text-orientation: mixed; font-size:18px; line-height:1.25; max-width:86%; max-height:86%; text-align:center; white-space:pre-wrap; }
-    .thumb .idx{ position:absolute; bottom:6px; right:8px; font-size:11px; opacity:.6; background:#fff; padding:2px 6px; border-radius:999px; border:1px solid #0002; }
-    .thumb.active{ outline:3px solid #1115; }
-
-    footer{ text-align:center; opacity:.7; padding:0 0 24px; }
-    .stage:fullscreen{
-      width:100vw; height:100vh; border-radius:0;
-      display:flex; justify-content:center; align-items:flex-start;
-      /* 画面に応じて自動調整：最小40px / 標準12vh / 最大500px */
-      padding-top: clamp(40px, 12vh, 500px);
-    }
-  /* ===== フルスクリーン時のレイアウト調整 ===== */
-    /* 要素自身がフルスクリーンのとき中央配置に切替 */
-    .stage:fullscreen{
-      width:100vw; height:100vh; border-radius:0;
-      display:flex; justify-content:center; align-items:center;
-      padding-top:0; /* 上余白をリセット */
-    }
-      /* Safari 等のプリフィックス対応 */
-    .stage:-webkit-full-screen{
-      width:100vw; height:100vh; border-radius:0;
-      display:flex; justify-content:center; align-items:flex-start;
-      padding-top: clamp(40px, 12vh, 500px);
-    }
-</style>
+  <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
+  <!-- ===== 上部ツールバー ===== -->
   <header>
     <div class="toolbar">
       <div class="row">
-        <textarea id="editor" placeholder="ページ内容を入力し、『+ 1ページ追加』で追加"></textarea>
-        <label style="display:flex;align-items:center;gap:8px;">
+        <!-- 画面上には出さないが内部的に使うエディタ -->
+        <textarea id="editor" style="display:none;"></textarea>
+
+        <label class="font-label">
           文字サイズ
-          <input id="fontSize" type="number" min="12" max="200" value="64" style="width:84px;" />
+          <input id="fontSize" type="number" min="12" max="200" value="64" />
           <span>px</span>
         </label>
-      </div>
-      <div class="row">
+
         <button id="addOne">+ 1ページ追加</button>
-        <button id="addLines">改行ごとに追加</button>
-        <button id="duplicate">現在を複製</button>
-        <button id="delete">現在を削除</button>
-        <button id="update">現在を上書き</button>
+        <button id="duplicate">ページを複製</button>
+        <button id="delete">ページを削除</button>
         <button id="prev">◀ 前へ</button>
         <button id="next">次へ ▶</button>
+        <button id="rasterize">ラスタライズ</button>
+        <button id="backToText">テキストに戻す</button>
         <button id="save">保存</button>
         <button id="load">読込</button>
         <button id="export">書き出し</button>
-        <input id="importFile" type="file" accept="application/json" style="display:none" />
         <button id="import">読み込み</button>
-        <span id="counter" style="opacity:.7"></span>
+        <span id="counter" class="page-counter"></span>
       </div>
     </div>
   </header>
 
+  <!-- JSONインポート用（非表示） -->
+  <input id="importFile" type="file" accept="application/json" style="display:none" />
+  <!-- 画像インポート用（非表示） -->
+  <input id="imageFile" type="file" accept="image/*" style="display:none" />
+
+  <!-- ===== メインステージ ===== -->
   <main>
     <div class="stage">
       <div id="output" class="text">文字を視る</div>
       <div class="badge" id="badge">01</div>
+      <!-- char-layer は JS 側で追加される -->
     </div>
   </main>
 
+  <!-- ===== サムネイル（ページ一覧） ===== -->
   <div class="railWrap">
     <div id="rail" class="rail" aria-label="ページ一覧"></div>
   </div>
 
-  <footer>サムネイルクリックでジャンプ、ダブルクリックで直接編集できます。 / ←→ でページ送り / <strong>Fでページだけフルスクリーン</strong></footer>
+  <!-- ===== オブジェクトパネル（左） ===== -->
+  <aside id="objectPanel" class="object-panel">
+    <div class="panel-drag-handle">OBJECTS</div>
 
-  <script>
-    const LS_KEY = 'kamishibai_pages_v1';
+    <!-- 図形＆テキストツール -->
+    <div class="object-panel-section">
+      <div class="object-panel-title">TOOLS</div>
+      <div class="object-tool-row">
+        <button id="shapeCircleFill" class="object-tool-btn" title="塗り丸">●</button>
+        <button id="shapeCircleRing" class="object-tool-btn" title="線だけの丸">○</button>
+        <button id="shapeTriangle" class="object-tool-btn" title="三角">▲</button>
+        <button id="shapeSquare" class="object-tool-btn" title="正方形">■</button>
+        <button id="shapeFullRect" class="object-tool-btn" title="全面長方形">▭</button>
+      </div>
+      <div class="object-tool-row">
+        <button id="toolTextBtn" class="object-tool-btn" title="テキスト">T</button>
+        <input
+          id="toolTextInput"
+          type="text"
+          placeholder="テキスト"
+          class="object-text-input"
+        />
+      </div>
+      <p class="object-hint">
+        Tを押すとテキストボックスを追加できます。<br>
+        Sキーでサイズ編集モードのON/OFF。
+      </p>
+    </div>
 
-    const editor = document.getElementById('editor');
-    const output = document.getElementById('output');
-    const fontSize = document.getElementById('fontSize');
-    const badge = document.getElementById('badge');
-    const counter = document.getElementById('counter');
-    const rail = document.getElementById('rail');
+    <!-- カラー -->
+    <div class="object-panel-section">
+      <div class="object-panel-title">COLOR</div>
+      <div class="color-palette">
+        <button class="color-swatch active" data-color="#111111" style="background:#111111;"></button>
+        <button class="color-swatch" data-color="#e53935" style="background:#e53935;"></button>
+        <button class="color-swatch" data-color="#1565c0" style="background:#1565c0;"></button>
+        <button class="color-swatch" data-color="#fbc02d" style="background:#fbc02d;"></button>
+        <button class="color-swatch" data-color="#8e24aa" style="background:#8e24aa;"></button>
+        <button class="color-swatch" data-color="#00897b" style="background:#00897b;"></button>
+      </div>
+      <div class="color-custom-row">
+        <span>Custom</span>
+        <input id="customColor" type="color" value="#111111" />
+      </div>
+    </div>
 
-    const addOneBtn = document.getElementById('addOne');
-    const addLinesBtn = document.getElementById('addLines');
-    const duplicateBtn = document.getElementById('duplicate');
-    const deleteBtn = document.getElementById('delete');
-    const updateBtn = document.getElementById('update');
-    const prevBtn = document.getElementById('prev');
-    const nextBtn = document.getElementById('next');
-    const saveBtn = document.getElementById('save');
-    const loadBtn = document.getElementById('load');
-    const exportBtn = document.getElementById('export');
-    const importBtn = document.getElementById('import');
-    const importFile = document.getElementById('importFile');
+    <!-- SNAP（スナップ機能） -->
+    <div class="object-panel-section">
+      <div class="object-panel-title">SNAP</div>
+      <label class="snap-toggle">
+        <input type="checkbox" id="snapCenterToggle" />
+        <span>中央スナップ</span>
+      </label>
+      <p class="snap-hint">
+        ON のとき、キャンバス中央付近や他のオブジェクトの<br>
+        中心付近で離すと、ぴったり揃います。
+      </p>
+    </div>
+  </aside>
 
-    let slides = ['文字を視る'];
-    let idx = 0;
+  <!-- ===== レイヤーパネル（右上） ===== -->
+  <aside id="panelLayers" class="layers-panel">
+    <div class="panel-drag-handle">LAYERS</div>
+    <ul id="layerList" class="layer-list"></ul>
+  </aside>
 
-    function renderStage(){
-      output.textContent = slides[idx] || '（空）';
-      output.style.fontSize = Number(fontSize.value) + 'px';
-      editor.value = slides[idx] || '';
-      badge.textContent = String(idx+1).padStart(2,'0');
-      counter.textContent = 'ページ ' + (idx+1) + ' / ' + slides.length;
-      renderRail();
-      persist();
-    }
+  <!-- ===== コードパネル（右下） ===== -->
+  <aside id="panelCode" class="code-panel">
+    <div class="panel-drag-handle">CANVAS CODE</div>
+    <textarea id="canvasCode" class="code-textarea" readonly></textarea>
+    <button id="copyCode" class="copy-code-btn">コードをコピー</button>
+  </aside>
 
-    function renderRail(){
-      rail.innerHTML = '';
-      slides.forEach((txt, i)=>{
-        const t = document.createElement('div');
-        t.className = 'thumb' + (i===idx?' active':'');
-        const tt = document.createElement('div');
-        tt.className = 'ttext';
-        tt.textContent = txt || '（空）';
-        const id = document.createElement('div');
-        id.className = 'idx';
-        id.textContent = String(i+1).padStart(2,'0');
-        t.appendChild(tt); t.appendChild(id);
-        t.addEventListener('click', ()=>{ idx = i; renderStage(); });
-        rail.appendChild(t);
-      });
-    }
+  <!-- ===== フッター ===== -->
+  <footer>
+    サムネイルクリックでページジャンプ / キャンバスをクリックして Enter でテキスト編集開始 /
+    ←→ でページ送り / <strong>Fでページだけフルスクリーン</strong> /
+    <strong>Sでサイズ編集モード</strong> /
+    <strong>Ctrl+Z / Ctrl+Shift+Z = Undo / Redo</strong>
+  </footer>
 
-    function addOne(){
-      const val = editor.value.trim();
-      slides.splice(idx+1, 0, val || '');
-      idx = Math.min(idx+1, slides.length-1);
-      renderStage();
-    }
-
-    function addLines(){
-      const lines = editor.value.split('\r\n').join('\n').split('\n').map(s=>s.trim());
-      if(lines.length===0) return;
-      const toAdd = lines.filter(s=>s.length>0);
-      if(toAdd.length===0) toAdd.push('');
-      slides.splice(idx+1, 0, ...toAdd);
-      idx = Math.min(idx + toAdd.length, slides.length-1);
-      renderStage();
-    }
-
-    function duplicate(){ slides.splice(idx+1, 0, slides[idx] || ''); idx++; renderStage(); }
-    function remove(){ if(slides.length===1){ slides[0]=''; idx=0; renderStage(); return;} slides.splice(idx,1); idx=Math.max(0,Math.min(idx,slides.length-1)); renderStage(); }
-    function updateCurrent(){ slides[idx] = editor.value.trim(); renderStage(); }
-    function next(){ idx = Math.min(slides.length-1, idx+1); renderStage(); }
-    function prev(){ idx = Math.max(0, idx-1); renderStage(); }
-
-    function persist(){ localStorage.setItem(LS_KEY, JSON.stringify({slides, idx, fontSize:Number(fontSize.value)})); }
-    function load(){ const raw = localStorage.getItem(LS_KEY); if(!raw) return false; try{ const st=JSON.parse(raw); slides=Array.isArray(st.slides)?st.slides:['']; idx=Math.min(Math.max(0,st.idx||0),slides.length-1); if(st.fontSize) fontSize.value=st.fontSize; renderStage(); return true;}catch(e){console.warn(e); return false;} }
-
-    exportBtn.addEventListener('click', ()=>{ const blob=new Blob([JSON.stringify({slides,idx,fontSize:Number(fontSize.value)},null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='kamishibai.json'; a.click(); URL.revokeObjectURL(a.href); });
-    importBtn.addEventListener('click', ()=> importFile.click());
-    importFile.addEventListener('change', async e=>{ const f=e.target.files?.[0]; if(!f) return; const txt=await f.text(); try{ const st=JSON.parse(txt); slides=Array.isArray(st.slides)?st.slides:['']; idx=Math.min(Math.max(0,st.idx||0),slides.length-1); if(st.fontSize) fontSize.value=st.fontSize; renderStage(); }catch(err){ alert('JSONの読み込みに失敗しました'); } });
-
-    addOneBtn.addEventListener('click', addOne);
-    addLinesBtn.addEventListener('click', addLines);
-    duplicateBtn.addEventListener('click', duplicate);
-    deleteBtn.addEventListener('click', remove);
-    updateBtn.addEventListener('click', updateCurrent);
-    prevBtn.addEventListener('click', prev);
-    nextBtn.addEventListener('click', next);
-    saveBtn.addEventListener('click', persist);
-    loadBtn.addEventListener('click', ()=>{ if(!load()) alert('保存データが見つかりません'); });
-
-    fontSize.addEventListener('input', ()=>{ output.style.fontSize = Number(fontSize.value)+'px'; persist(); });
-
-    output.addEventListener('dblclick', ()=>{ output.contentEditable = true; output.classList.add('editing'); placeCaretAtEnd(output); });
-    function commitInline(){ if(!output.isContentEditable) return; const txt=output.innerText.trim(); slides[idx]=txt; editor.value=txt; output.contentEditable=false; output.classList.remove('editing'); renderRail(); persist(); }
-    output.addEventListener('blur', commitInline);
-    output.addEventListener('keydown', e=>{ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); commitInline(); } });
-
-    function placeCaretAtEnd(el){ const range=document.createRange(); range.selectNodeContents(el); range.collapse(false); const sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(range); }
-
-    function toggleFullscreen(){
-      const stage = document.querySelector('.stage');
-      if(!document.fullscreenElement){
-        if(stage && stage.requestFullscreen){
-          stage.requestFullscreen({ navigationUI: 'hide' }).catch(()=>{});
-        }
-      }else{
-        if(document.exitFullscreen){ document.exitFullscreen().catch(()=>{}); }
-      }
-    }
-
-    editor.addEventListener('keydown', e=>{ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ addOne(); e.preventDefault(); } });
-    window.addEventListener('keydown', e=>{ const tag=(document.activeElement?.tagName||'').toLowerCase(); if(tag==='textarea' || document.activeElement?.isContentEditable) return; if(e.key==='ArrowRight'||e.key==='PageDown') next(); if(e.key==='ArrowLeft'||e.key==='PageUp') prev(); if(e.key==='Delete') remove(); if(e.key==='f'||e.key==='F'){ e.preventDefault(); toggleFullscreen(); } });
-
-    if(!load()) renderStage();
-  </script>
+  <script src="js/app.js"></script>
 </body>
 </html>
