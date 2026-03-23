@@ -67,7 +67,6 @@ const duplicateBtn = document.getElementById('duplicate');
 const deleteBtn = document.getElementById('delete');
 const prevBtn = document.getElementById('prev');
 const nextBtn = document.getElementById('next');
-const saveBtn = document.getElementById('save');
 const exportBtn = document.getElementById('export');
 const importBtn = document.getElementById('import');
 const importFile = document.getElementById('importFile');
@@ -2010,16 +2009,6 @@ duplicateBtn.addEventListener('click', duplicate);
 deleteBtn.addEventListener('click', remove);
 prevBtn.addEventListener('click', prev);
 nextBtn.addEventListener('click', next);
-saveBtn.addEventListener('click', async () => {
-  try {
-    const data = { slides, idx, fontSize: Number(fontSize.value) };
-    await idbSave(data);
-    saveBtn.textContent = '保存しました';
-    setTimeout(() => { saveBtn.textContent = '保存'; }, 1200);
-  } catch (e) {
-    alert('保存に失敗しました');
-  }
-});
 
 rasterizeBtn.addEventListener('click', () => {
   if (!rasterizeSelectedTextbox()) {
@@ -2291,3 +2280,49 @@ function makePanelDraggable(panel) {
 makePanelDraggable(document.getElementById('objectPanel'));
 makePanelDraggable(document.getElementById('panelLayers'));
 makePanelDraggable(document.getElementById('panelCode'));
+
+
+// ==================================================
+// 表示切替バー
+// ==================================================
+
+const VIEW_STORAGE_KEY = 'kamishibai_view_toggles';
+
+function loadViewToggles() {
+  try {
+    const raw = localStorage.getItem(VIEW_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) { return null; }
+}
+
+function saveViewToggles(state) {
+  localStorage.setItem(VIEW_STORAGE_KEY, JSON.stringify(state));
+}
+
+(function initViewToggles() {
+  const saved = loadViewToggles() || {};
+  const buttons = document.querySelectorAll('.view-toggle');
+
+  buttons.forEach(btn => {
+    const targetId = btn.dataset.target;
+    const el = document.getElementById(targetId);
+    if (!el) return;
+
+    // 保存状態を復元（デフォルトは表示）
+    if (saved[targetId] === false) {
+      el.classList.add('panel-hidden');
+      btn.classList.remove('active');
+    }
+
+    btn.addEventListener('click', () => {
+      const isVisible = !el.classList.contains('panel-hidden');
+      el.classList.toggle('panel-hidden', isVisible);
+      btn.classList.toggle('active', !isVisible);
+
+      // 状態を保存
+      const current = loadViewToggles() || {};
+      current[targetId] = !isVisible;
+      saveViewToggles(current);
+    });
+  });
+})();

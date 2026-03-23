@@ -11,7 +11,17 @@
 <body>
   <!-- ===== ヘッダー / ツールバー ===== -->
   <header>
-    <div class="toolbar">
+    <!-- 表示切替バー -->
+    <div class="view-toggle-bar">
+      <button class="view-toggle active" type="button" data-target="toolbar-main" title="ツールバー">ツール</button>
+      <button class="view-toggle active" type="button" data-target="railWrap" title="サムネイル">サムネ</button>
+      <button class="view-toggle active" type="button" data-target="objectPanel" title="OBJECTSパネル">OBJ</button>
+      <button class="view-toggle active" type="button" data-target="panelLayers" title="LAYERSパネル">LAYER</button>
+      <button class="view-toggle active" type="button" data-target="panelCode" title="CANVAS CODEパネル">CODE</button>
+      <button class="view-toggle active" type="button" data-target="appFooter" title="操作説明">Usage</button>
+    </div>
+
+    <div class="toolbar" id="toolbar-main">
       <div class="row">
         <label class="font-label">
           文字サイズ
@@ -28,7 +38,6 @@
         <button id="delete">ページを削除</button>
         <button id="prev">◀ 前へ</button>
         <button id="next">次へ ▶</button>
-        <button id="save">保存</button>
         <button id="export">ファイルに保存</button>
         <button id="import">ファイルを開く</button>
         <button id="exportImage">画像として保存</button>
@@ -50,7 +59,7 @@
   </main>
 
   <!-- ===== サムネイル ===== -->
-  <div class="railWrap">
+  <div class="railWrap" id="railWrap">
     <div id="rail" class="rail" aria-label="ページ一覧"></div>
   </div>
 
@@ -146,7 +155,7 @@
   <!-- 画像挿入用（ダブルクリック時に開く） -->
   <input id="imageFile" type="file" accept="image/*" style="display:none" />
 
-  <footer>
+  <footer id="appFooter">
     サムネイルクリックでページジャンプ / ←→ でページ送り /
     <strong>Fでページだけフルスクリーン</strong> / Sでサイズ編集モード /
     Ctrl+Z / Ctrl+Shift+Z でUndo/Redo
