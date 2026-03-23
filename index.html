@@ -6,6 +6,7 @@
   <title>縦書き 紙芝居エディタ（ページ対応）</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
   <!-- ===== ヘッダー / ツールバー ===== -->
@@ -28,10 +29,10 @@
         <button id="prev">◀ 前へ</button>
         <button id="next">次へ ▶</button>
         <button id="save">保存</button>
-        <button id="load">読込</button>
-        <button id="export">書き出し</button>
-        <button id="import">読み込み</button>
-        <input id="importFile" type="file" accept="application/json" style="display:none" />
+        <button id="export">ファイルに保存</button>
+        <button id="import">ファイルを開く</button>
+        <button id="exportImage">画像として保存</button>
+        <input id="importFile" type="file" accept=".kmshb,.json" style="display:none" />
       </div>
     </div>
   </header>

@@ -92,8 +92,8 @@ main {
 }
 
 .stage {
-  width: var(--stage-w);
-  height: var(--stage-h);
+  width: min(var(--stage-w), calc(100vw - 32px));
+  aspect-ratio: 3 / 2;
   background: #d6d6d6;
   border-radius: 24px;
   box-shadow: 0 8px 28px #0000001a, inset 0 0 0 1px #0002;
@@ -491,4 +491,147 @@ footer {
   opacity: .7;
   padding-bottom: 24px;
   font-size: 13px;
+}
+
+/* =========================================
+   レスポンシブ
+========================================= */
+
+/* --- 中画面（タブレット / 狭いデスクトップ） --- */
+@media (max-width: 1200px) {
+  .object-panel,
+  .layers-panel,
+  .code-panel {
+    width: 220px;
+    padding: 10px;
+  }
+}
+
+/* --- 小画面（スマホ横 / 小タブレット） --- */
+@media (max-width: 768px) {
+  header {
+    position: relative; /* sticky だとスクロール領域を圧迫する */
+  }
+
+  .toolbar {
+    padding: 8px 10px;
+  }
+
+  .row {
+    gap: 5px;
+  }
+
+  button {
+    padding: 7px 10px;
+    font-size: 13px;
+  }
+
+  .font-label input {
+    width: 54px;
+  }
+
+  .stage {
+    border-radius: 12px;
+  }
+
+  .text {
+    font-size: 40px;
+    padding: 6px;
+  }
+
+  /* サムネイル縮小 */
+  .thumb {
+    width: 140px;
+    height: 93px;
+  }
+
+  .ttext {
+    font-size: 13px;
+  }
+
+  /* パネル：画面下部にオーバーレイ、折りたたみ可能 */
+  .object-panel,
+  .layers-panel,
+  .code-panel {
+    position: fixed;
+    left: 8px !important;
+    right: 8px !important;
+    top: auto !important;
+    bottom: 0 !important;
+    width: auto;
+    max-height: 50vh;
+    border-radius: 14px 14px 0 0;
+    transform: translateY(calc(100% - 40px));
+    transition: transform 0.3s ease;
+  }
+
+  .object-panel.panel-open,
+  .layers-panel.panel-open,
+  .code-panel.panel-open {
+    transform: translateY(0);
+  }
+
+  .panel-drag-handle {
+    text-align: center;
+  }
+
+  footer {
+    font-size: 11px;
+    padding-bottom: 52px; /* パネルの取っ手分 */
+  }
+}
+
+/* --- 極小画面（スマホ縦） --- */
+@media (max-width: 480px) {
+  .toolbar {
+    padding: 6px 6px;
+  }
+
+  button {
+    padding: 6px 8px;
+    font-size: 12px;
+    border-radius: 8px;
+  }
+
+  .stage {
+    border-radius: 8px;
+  }
+
+  .text {
+    font-size: 28px;
+  }
+
+  .thumb {
+    width: 110px;
+    height: 73px;
+  }
+
+  .ttext {
+    font-size: 11px;
+  }
+
+  .badge {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+}
+
+/* --- 高さが足りない場合（横向きスマホ等） --- */
+@media (max-height: 500px) {
+  .stage {
+    width: min(var(--stage-w), calc(100vw - 32px), calc((100vh - 120px) * 1.5));
+  }
+
+  main {
+    padding: 4px 8px 0;
+  }
+
+  .railWrap {
+    margin: 6px auto 8px;
+  }
+
+  .thumb {
+    width: 120px;
+    height: 80px;
+  }
 }

@@ -2,7 +2,47 @@
 //  app.js  （縦書き紙芝居エディタ + レイヤー + 手書きモード）
 // ==================================================
 
-const LS_KEY = 'kamishibai_pages_v8';
+const LS_KEY = 'kamishibai_pages_v8'; // localStorage（旧形式、マイグレーション用）
+
+// IndexedDB 定数
+const IDB_NAME = 'kamishibai_db';
+const IDB_VERSION = 1;
+const IDB_STORE = 'projects';
+const IDB_KEY = 'default';
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function idbSave(data) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(data, IDB_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function idbLoad() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readonly');
+    const req = tx.objectStore(IDB_STORE).get(IDB_KEY);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
 
 // 論理座標（レイアウトの基準となる仮想キャンバス）
 const LOGICAL_W = 1080;
@@ -28,7 +68,6 @@ const deleteBtn = document.getElementById('delete');
 const prevBtn = document.getElementById('prev');
 const nextBtn = document.getElementById('next');
 const saveBtn = document.getElementById('save');
-const loadBtn = document.getElementById('load');
 const exportBtn = document.getElementById('export');
 const importBtn = document.getElementById('import');
 const importFile = document.getElementById('importFile');
@@ -61,6 +100,9 @@ const copyCodeBtn = document.getElementById('copyCode');
 
 // 画像挿入
 const imageFile = document.getElementById('imageFile');
+
+// 画像書き出し
+const exportImageBtn = document.getElementById('exportImage');
 
 // ===== データ構造 =====
 // slides[i] = { text: string, raster: { fontSize:number, layers:[layer...] } | null }
@@ -699,28 +741,44 @@ function prev() {
 // ==================================================
 
 function persist() {
-  localStorage.setItem(
-    LS_KEY,
-    JSON.stringify({ slides, idx, fontSize: Number(fontSize.value) })
-  );
+  const data = { slides, idx, fontSize: Number(fontSize.value) };
+  idbSave(data).catch(err => console.warn('IndexedDB save failed:', err));
 }
 
-function load() {
+function restoreFromState(st) {
+  if (Array.isArray(st.slides)) {
+    slides = st.slides.map(normalizeSlide);
+  } else if (Array.isArray(st)) {
+    slides = st.map(normalizeSlide);
+  } else {
+    slides = [{ text: '', raster: null }];
+  }
+  idx = Math.min(Math.max(0, st.idx || 0), slides.length - 1);
+  if (st.fontSize) fontSize.value = st.fontSize;
+  clearSelectedObj();
+  renderStage();
+}
+
+async function load() {
+  // 1) IndexedDB から読み込み
+  try {
+    const st = await idbLoad();
+    if (st && (st.slides || Array.isArray(st))) {
+      restoreFromState(st);
+      return true;
+    }
+  } catch (e) {
+    console.warn('IndexedDB load failed:', e);
+  }
+
+  // 2) localStorage からマイグレーション
   const raw = localStorage.getItem(LS_KEY);
   if (!raw) return false;
   try {
     const st = JSON.parse(raw);
-    if (Array.isArray(st.slides)) {
-      slides = st.slides.map(normalizeSlide);
-    } else if (Array.isArray(st)) {
-      slides = st.map(normalizeSlide);
-    } else {
-      slides = [{ text: '', raster: null }];
-    }
-    idx = Math.min(Math.max(0, st.idx || 0), slides.length - 1);
-    if (st.fontSize) fontSize.value = st.fontSize;
-    clearSelectedObj();
-    renderStage();
+    restoreFromState(st);
+    // IndexedDB に移行保存
+    persist();
     return true;
   } catch (e) {
     console.warn(e);
@@ -1681,16 +1739,192 @@ copyCodeBtn.addEventListener('click', () => {
   }
 });
 
-exportBtn.addEventListener('click', () => {
-  const blob = new Blob(
-    [JSON.stringify({ slides, idx, fontSize: Number(fontSize.value) }, null, 2)],
-    { type: 'application/json' }
-  );
+// ==================================================
+// ファイル保存ダイアログ（名前・場所を選択可能）
+// ==================================================
+
+async function saveWithPicker(blob, suggestedName, fileTypes) {
+  // File System Access API 対応ブラウザ → ネイティブ保存ダイアログ
+  if (window.showSaveFilePicker) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName,
+        types: fileTypes
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return true;
+    } catch (e) {
+      if (e.name === 'AbortError') return false; // ユーザーがキャンセル
+      // API失敗時はフォールバック
+    }
+  }
+  // フォールバック：通常ダウンロード
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'kamishibai.json';
+  a.download = suggestedName;
   a.click();
   URL.revokeObjectURL(a.href);
+  return true;
+}
+
+
+// ==================================================
+// スライドを画像としてレンダリング
+// ==================================================
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('画像の読み込みに失敗'));
+    img.src = src;
+  });
+}
+
+async function renderSlideToCanvas(slideIndex) {
+  const canvas = document.createElement('canvas');
+  canvas.width = LOGICAL_W;
+  canvas.height = LOGICAL_H;
+  const ctx = canvas.getContext('2d');
+
+  // 背景
+  ctx.fillStyle = '#d6d6d6';
+  ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+
+  const page = slides[slideIndex];
+  const raster = page.raster;
+  const layers = raster ? getRasterItems(raster) : [];
+
+  if (layers.length > 0) {
+    // ラスタライズ済み：全レイヤーを描画
+    for (const layer of layers) {
+      if (layer.kind === 'char') {
+        const col = layer.color || getInkColor();
+        ctx.fillStyle = col;
+        ctx.font = `${layer.baseSize}px "Noto Sans JP", system-ui, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(layer.ch, layer.logicX, layer.logicY);
+      } else if (layer.kind === 'image') {
+        try {
+          const img = await loadImage(layer.src);
+          const w = layer.baseW || 200;
+          const h = layer.baseH || 200;
+          ctx.drawImage(img, layer.logicX - w / 2, layer.logicY - h / 2, w, h);
+        } catch (_) { /* skip broken images */ }
+      } else if (layer.kind === 'shape') {
+        drawShapeOnCtx(ctx, layer, 1, 0, 0);
+      } else if (layer.kind === 'stroke') {
+        const pts = layer.points || [];
+        if (pts.length > 1) {
+          ctx.strokeStyle = layer.color || getInkColor();
+          ctx.lineWidth = layer.width || 4;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.beginPath();
+          pts.forEach((pt, i) => {
+            if (i === 0) ctx.moveTo(pt.x, pt.y);
+            else ctx.lineTo(pt.x, pt.y);
+          });
+          ctx.stroke();
+        }
+      }
+    }
+  } else {
+    // テキストモード：縦書きレンダリング
+    const text = page.text || '';
+    if (text) {
+      const fs = Number(fontSize.value) || 64;
+      const charH = fs * 1.2;
+      const charW = fs * 1.1;
+      const usableHeight = LOGICAL_H * 0.8;
+      const topBase = (LOGICAL_H - usableHeight) / 2;
+      const maxRows = Math.max(1, Math.floor(usableHeight / charH));
+
+      const chars = [];
+      let col = 0, row = 0;
+      for (const ch of text) {
+        if (ch === '\n') { col++; row = 0; continue; }
+        chars.push({ ch, col, row });
+        row++;
+        if (row >= maxRows) { row = 0; col++; }
+      }
+
+      const totalCols = chars.length ? (chars[chars.length - 1].col + 1) : 1;
+      const totalWidth = totalCols * charW;
+      const leftBase = (LOGICAL_W + totalWidth) / 2 - charW;
+
+      ctx.fillStyle = getInkColor();
+      ctx.font = `${fs}px "Noto Sans JP", system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      chars.forEach(info => {
+        const x = leftBase - info.col * charW + charW / 2;
+        const y = topBase + info.row * charH + charH / 2;
+        ctx.fillText(info.ch, x, y);
+      });
+    }
+  }
+
+  return canvas;
+}
+
+
+// ==================================================
+// ファイル書き出し (.kmshb) / 読み込み / 画像書き出し
+// ==================================================
+
+exportBtn.addEventListener('click', async () => {
+  try {
+    exportBtn.disabled = true;
+    exportBtn.textContent = '保存中…';
+
+    const zip = new JSZip();
+    const exportSlides = JSON.parse(JSON.stringify(slides));
+    const imgFolder = zip.folder('images');
+    let imgIndex = 0;
+
+    exportSlides.forEach(slide => {
+      if (!slide.raster || !slide.raster.layers) return;
+      slide.raster.layers.forEach(layer => {
+        if (layer.kind === 'image' && layer.src && layer.src.startsWith('data:')) {
+          const match = layer.src.match(/^data:image\/(\w+);base64,(.+)$/);
+          if (match) {
+            const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
+            const filename = `img_${imgIndex}.${ext}`;
+            imgFolder.file(filename, match[2], { base64: true });
+            layer.src = `images/${filename}`;
+            imgIndex++;
+          }
+        }
+      });
+    });
+
+    const data = {
+      version: 1,
+      slides: exportSlides,
+      idx,
+      fontSize: Number(fontSize.value)
+    };
+    zip.file('data.json', JSON.stringify(data, null, 2));
+
+    const blob = await zip.generateAsync({ type: 'blob' });
+    await saveWithPicker(blob, 'kamishibai.kmshb', [
+      {
+        description: '紙芝居プロジェクト',
+        accept: { 'application/octet-stream': ['.kmshb'] }
+      }
+    ]);
+  } catch (err) {
+    console.error(err);
+    alert('ファイル保存に失敗しました');
+  } finally {
+    exportBtn.disabled = false;
+    exportBtn.textContent = 'ファイルに保存';
+  }
 });
 
 importBtn.addEventListener('click', () => importFile.click());
@@ -1698,25 +1932,71 @@ importBtn.addEventListener('click', () => importFile.click());
 importFile.addEventListener('change', async e => {
   const f = e.target.files?.[0];
   if (!f) return;
-  const txt = await f.text();
+
   try {
-    const st = JSON.parse(txt);
-    pushUndoState();
-    if (Array.isArray(st.slides)) {
-      slides = st.slides.map(normalizeSlide);
-      idx = Math.min(Math.max(0, st.idx || 0), slides.length - 1);
-      if (st.fontSize) fontSize.value = st.fontSize;
-    } else if (Array.isArray(st)) {
-      slides = st.map(normalizeSlide);
-      idx = 0;
+    let st;
+
+    if (f.name.endsWith('.json')) {
+      const txt = await f.text();
+      st = JSON.parse(txt);
     } else {
-      slides = [{ text: '', raster: null }];
-      idx = 0;
+      const zip = await JSZip.loadAsync(f);
+      const dataFile = zip.file('data.json');
+      if (!dataFile) throw new Error('data.json が見つかりません');
+      const txt = await dataFile.async('string');
+      st = JSON.parse(txt);
+
+      if (Array.isArray(st.slides)) {
+        for (const slide of st.slides) {
+          if (!slide.raster || !slide.raster.layers) continue;
+          for (const layer of slide.raster.layers) {
+            if (layer.kind === 'image' && layer.src && !layer.src.startsWith('data:')) {
+              const imgFile = zip.file(layer.src);
+              if (imgFile) {
+                const base64 = await imgFile.async('base64');
+                const ext = layer.src.split('.').pop().toLowerCase();
+                const mime = ext === 'jpg' ? 'jpeg' : ext;
+                layer.src = `data:image/${mime};base64,${base64}`;
+              }
+            }
+          }
+        }
+      }
     }
-    clearSelectedObj();
-    renderStage();
+
+    pushUndoState();
+    restoreFromState(st);
   } catch (err) {
-    alert('JSONの読み込みに失敗しました');
+    console.error(err);
+    alert('ファイルの読み込みに失敗しました');
+  }
+
+  importFile.value = '';
+});
+
+// 画像として保存
+exportImageBtn.addEventListener('click', async () => {
+  try {
+    exportImageBtn.disabled = true;
+    exportImageBtn.textContent = '描画中…';
+
+    const canvas = await renderSlideToCanvas(idx);
+
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    const pageName = `kamishibai_${String(idx + 1).padStart(2, '0')}.png`;
+
+    await saveWithPicker(blob, pageName, [
+      {
+        description: 'PNG画像',
+        accept: { 'image/png': ['.png'] }
+      }
+    ]);
+  } catch (err) {
+    console.error(err);
+    alert('画像の保存に失敗しました');
+  } finally {
+    exportImageBtn.disabled = false;
+    exportImageBtn.textContent = '画像として保存';
   }
 });
 
@@ -1730,9 +2010,15 @@ duplicateBtn.addEventListener('click', duplicate);
 deleteBtn.addEventListener('click', remove);
 prevBtn.addEventListener('click', prev);
 nextBtn.addEventListener('click', next);
-saveBtn.addEventListener('click', persist);
-loadBtn.addEventListener('click', () => {
-  if (!load()) alert('保存データが見つかりません');
+saveBtn.addEventListener('click', async () => {
+  try {
+    const data = { slides, idx, fontSize: Number(fontSize.value) };
+    await idbSave(data);
+    saveBtn.textContent = '保存しました';
+    setTimeout(() => { saveBtn.textContent = '保存'; }, 1200);
+  } catch (e) {
+    alert('保存に失敗しました');
+  }
 });
 
 rasterizeBtn.addEventListener('click', () => {
@@ -1940,6 +2226,10 @@ document.addEventListener('webkitfullscreenchange', () => {
 // パネルをドラッグ可能にする
 // ==================================================
 
+function isMobileLayout() {
+  return window.matchMedia('(max-width: 768px)').matches;
+}
+
 function makePanelDraggable(panel) {
   if (!panel) return;
   const handle = panel.querySelector('.panel-drag-handle');
@@ -1949,7 +2239,18 @@ function makePanelDraggable(panel) {
   let offsetY = 0;
   let dragging = false;
 
+  // 小画面：タップで開閉
+  handle.addEventListener('click', () => {
+    if (!isMobileLayout()) return;
+    // 他のパネルを閉じてから開く
+    document.querySelectorAll('.object-panel, .layers-panel, .code-panel').forEach(p => {
+      if (p !== panel) p.classList.remove('panel-open');
+    });
+    panel.classList.toggle('panel-open');
+  });
+
   handle.addEventListener('mousedown', (e) => {
+    if (isMobileLayout()) return; // 小画面ではドラッグ無効
     dragging = true;
     const rect = panel.getBoundingClientRect();
     offsetX = e.clientX - rect.left;
@@ -1979,9 +2280,12 @@ function makePanelDraggable(panel) {
 // 初期化
 // ==================================================
 
-if (!load()) {
-  renderStage();
-}
+(async () => {
+  const loaded = await load();
+  if (!loaded) {
+    renderStage();
+  }
+})();
 
 // パネルをドラッグ可能に
 makePanelDraggable(document.getElementById('objectPanel'));
