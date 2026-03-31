@@ -260,7 +260,8 @@ function normalizeSlide(raw) {
   }
   return {
     text: raw && typeof raw.text === 'string' ? raw.text : '',
-    raster: r ? { fontSize: r.fontSize || 64, layers: r.layers || [] } : null
+    raster: r ? { fontSize: r.fontSize || 64, layers: r.layers || [] } : null,
+    name: raw && typeof raw.name === 'string' ? raw.name : ''
   };
 }
 
@@ -519,9 +520,14 @@ function renderStage() {
 
   if (hasRaster) {
     buildCharLayerFromRaster(raster);
+    setupDrawCanvas(); // ページ切り替え時にストロークを正しく再描画
   } else {
     mode = 'text';
     output.style.visibility = 'visible';
+    // テキストモードでは手書きキャンバスをクリア
+    if (drawCanvas && drawCtx) {
+      drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+    }
   }
 
   renderRail();
@@ -584,9 +590,12 @@ function drawShapeOnCtx(ctx, shape, scale, offsetX, offsetY) {
 
 function renderRail() {
   rail.innerHTML = '';
+
   slides.forEach((page, i) => {
+    // --- サムネイル本体 ---
     const t = document.createElement('div');
     t.className = 'thumb' + (i === idx ? ' active' : '');
+    t.draggable = true;
 
     const raster = page.raster;
     const layers = raster ? getRasterItems(raster) : [];
@@ -595,6 +604,8 @@ function renderRail() {
       const canvas = document.createElement('canvas');
       canvas.width = THUMB_W;
       canvas.height = THUMB_H;
+      canvas.style.width = '100%';
+      canvas.style.height = '100%';
       const ctx = canvas.getContext('2d');
 
       ctx.fillStyle = '#d6d6d6';
@@ -638,10 +649,10 @@ function renderRail() {
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             ctx.beginPath();
-            pts.forEach((pt, idx) => {
+            pts.forEach((pt, pi) => {
               const sx = offsetX + pt.x * scale;
               const sy = offsetY + pt.y * scale;
-              if (idx === 0) ctx.moveTo(sx, sy);
+              if (pi === 0) ctx.moveTo(sx, sy);
               else ctx.lineTo(sx, sy);
             });
             ctx.stroke();
@@ -662,6 +673,36 @@ function renderRail() {
     id.textContent = String(i + 1).padStart(2, '0');
     t.appendChild(id);
 
+    // --- ページ名ラベル ---
+    const nameEl = document.createElement('div');
+    nameEl.className = 'thumb-name';
+    nameEl.textContent = page.name || `ページ ${i + 1}`;
+    nameEl.title = 'クリックで名前を編集';
+
+    nameEl.addEventListener('click', e => {
+      e.stopPropagation();
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'thumb-name-input';
+      input.value = page.name || '';
+      input.placeholder = `ページ ${i + 1}`;
+      nameEl.replaceWith(input);
+      input.focus();
+      input.select();
+
+      const finish = () => {
+        slides[i].name = input.value.trim();
+        persist();
+        renderRail();
+      };
+      input.addEventListener('blur', finish);
+      input.addEventListener('keydown', e2 => {
+        if (e2.key === 'Enter') { e2.preventDefault(); input.blur(); }
+        if (e2.key === 'Escape') { input.value = page.name || ''; input.blur(); }
+      });
+    });
+
+    // --- サムネイルクリック（ページ移動） ---
     t.addEventListener('click', () => {
       commitInline();
       idx = i;
@@ -670,7 +711,54 @@ function renderRail() {
       renderStage();
     });
 
+    // --- ドラッグ＆ドロップ（順番入れ替え） ---
+    t.addEventListener('dragstart', e => {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(i));
+      t.classList.add('dragging');
+    });
+
+    t.addEventListener('dragend', () => {
+      t.classList.remove('dragging');
+    });
+
+    t.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      t.classList.add('drag-over');
+    });
+
+    t.addEventListener('dragleave', () => {
+      t.classList.remove('drag-over');
+    });
+
+    t.addEventListener('drop', e => {
+      e.preventDefault();
+      t.classList.remove('drag-over');
+      const from = parseInt(e.dataTransfer.getData('text/plain'));
+      const to = i;
+      if (from === to) return;
+
+      pushUndoState();
+      const moved = slides.splice(from, 1)[0];
+      slides.splice(to, 0, moved);
+
+      // 現在選択中ページのインデックスを追従
+      if (idx === from) {
+        idx = to;
+      } else if (from < to && idx > from && idx <= to) {
+        idx--;
+      } else if (from > to && idx >= to && idx < from) {
+        idx++;
+      }
+
+      persist();
+      renderRail();
+      renderStage();
+    });
+
     rail.appendChild(t);
+    rail.appendChild(nameEl);
   });
 }
 

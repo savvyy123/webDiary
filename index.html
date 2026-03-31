@@ -49,18 +49,20 @@
   <!-- 表に出さないテキストエディタ（既存ロジック保持用） -->
   <textarea id="editor" style="position:absolute; left:-9999px; top:-9999px;"></textarea>
 
-  <!-- ===== メインステージ ===== -->
-  <main>
-    <div class="stage">
-      <div id="output" class="text">文字を視る</div>
-      <div class="badge" id="badge">01</div>
-      <!-- ラスタライズレイヤーと手書きキャンバスは JS で追加 -->
-    </div>
-  </main>
+  <!-- ===== メインコンテンツ（ステージ＋右サイドバー） ===== -->
+  <div class="content-wrap">
+    <main>
+      <div class="stage">
+        <div id="output" class="text">文字を視る</div>
+        <div class="badge" id="badge">01</div>
+        <!-- ラスタライズレイヤーと手書きキャンバスは JS で追加 -->
+      </div>
+    </main>
 
-  <!-- ===== サムネイル ===== -->
-  <div class="railWrap" id="railWrap">
-    <div id="rail" class="rail" aria-label="ページ一覧"></div>
+    <!-- ===== サムネイル（右サイドバー） ===== -->
+    <div class="railWrap" id="railWrap">
+      <div id="rail" class="rail" aria-label="ページ一覧"></div>
+    </div>
   </div>
 
   <!-- ===== OBJECT パネル（左） ===== -->
