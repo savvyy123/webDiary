@@ -103,6 +103,7 @@ const imageFile = document.getElementById('imageFile');
 
 // 画像書き出し
 const exportImageBtn = document.getElementById('exportImage');
+const exportAllImagesBtn = document.getElementById('exportAllImages');
 
 // ===== データ構造 =====
 // slides[i] = { text: string, raster: { fontSize:number, layers:[layer...] } | null }
@@ -1944,6 +1945,11 @@ async function renderSlideToCanvas(slideIndex) {
         }
       }
     }
+  } else if (page.essayText) {
+    // エッセイモード：原稿用紙をレンダリング
+    ctx.fillStyle = '#fffef5';
+    ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+    drawEssayGrid(ctx, LOGICAL_W, LOGICAL_H, page.essayText, { padX: 36, padY: 28 });
   } else {
     // テキストモード：縦書きレンダリング
     const text = page.text || '';
@@ -2086,6 +2092,15 @@ importFile.addEventListener('change', async e => {
   importFile.value = '';
 });
 
+// ページ番号・名前からファイル名を生成
+function getPageFilename(i) {
+  const num = String(i + 1).padStart(2, '0');
+  const name = (slides[i].name || '').trim();
+  // ファイル名に使えない文字を除去
+  const safeName = name.replace(/[\\/:*?"<>|]/g, '');
+  return safeName ? `${num}_${safeName}.png` : `kamishibai_${num}.png`;
+}
+
 // 画像として保存
 exportImageBtn.addEventListener('click', async () => {
   try {
@@ -2095,7 +2110,7 @@ exportImageBtn.addEventListener('click', async () => {
     const canvas = await renderSlideToCanvas(idx);
 
     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-    const pageName = `kamishibai_${String(idx + 1).padStart(2, '0')}.png`;
+    const pageName = getPageFilename(idx);
 
     await saveWithPicker(blob, pageName, [
       {
@@ -2109,6 +2124,36 @@ exportImageBtn.addEventListener('click', async () => {
   } finally {
     exportImageBtn.disabled = false;
     exportImageBtn.textContent = '画像として保存';
+  }
+});
+
+// 画像をまとめて保存（全ページを zip に収録）
+exportAllImagesBtn.addEventListener('click', async () => {
+  try {
+    exportAllImagesBtn.disabled = true;
+
+    const zip = new JSZip();
+    for (let i = 0; i < slides.length; i++) {
+      exportAllImagesBtn.textContent = `描画中… ${i + 1}/${slides.length}`;
+      const canvas = await renderSlideToCanvas(i);
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      zip.file(getPageFilename(i), blob);
+    }
+
+    exportAllImagesBtn.textContent = 'zip 生成中…';
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    await saveWithPicker(zipBlob, 'kamishibai_images.zip', [
+      {
+        description: 'ZIP アーカイブ',
+        accept: { 'application/zip': ['.zip'] }
+      }
+    ]);
+  } catch (err) {
+    console.error(err);
+    alert('まとめて保存に失敗しました');
+  } finally {
+    exportAllImagesBtn.disabled = false;
+    exportAllImagesBtn.textContent = '画像をまとめて保存';
   }
 });
 
