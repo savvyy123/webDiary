@@ -60,6 +60,7 @@ const badge = document.getElementById('badge');
 const counter = document.getElementById('counter');
 const rail = document.getElementById('rail');
 const stage = document.querySelector('.stage');
+const stageInner = document.getElementById('stageInner');
 
 // ツールバー
 const addOneBtn = document.getElementById('addOne');
@@ -261,7 +262,8 @@ function normalizeSlide(raw) {
   return {
     text: raw && typeof raw.text === 'string' ? raw.text : '',
     raster: r ? { fontSize: r.fontSize || 64, layers: r.layers || [] } : null,
-    name: raw && typeof raw.name === 'string' ? raw.name : ''
+    name: raw && typeof raw.name === 'string' ? raw.name : '',
+    essayText: raw && typeof raw.essayText === 'string' ? raw.essayText : ''
   };
 }
 
@@ -533,6 +535,7 @@ function renderStage() {
   renderRail();
   persist();
   updateLayerAndCodeUI();
+  renderEssayOnStage();
 }
 
 // サムネイル用：図形描画（ステージと同等のスケールロジック）
@@ -660,6 +663,15 @@ function renderRail() {
         }
       });
 
+      t.appendChild(canvas);
+    } else if (page.essayText) {
+      // エッセイページのサムネイル
+      const canvas = document.createElement('canvas');
+      canvas.width = THUMB_W;
+      canvas.height = THUMB_H;
+      canvas.style.width = '100%';
+      canvas.style.height = '100%';
+      renderEssayThumbnail(canvas.getContext('2d'), THUMB_W, THUMB_H, page.essayText);
       t.appendChild(canvas);
     } else {
       const tt = document.createElement('div');
@@ -917,7 +929,7 @@ output.addEventListener('keydown', e => {
 });
 
 stage.addEventListener('click', e => {
-  if (e.target === stage) {
+  if (e.target === stage || e.target === stageInner) {
     clearSelectedObj();
   }
   stageSelected = true;
@@ -955,20 +967,33 @@ function exitRasterMode() {
 }
 
 // ステージの論理→画面変換情報
+// rect / scale / offsetX / offsetY : ズーム込みの視覚値（マウスイベント変換用）
+// baseRect / baseScale / baseOffsetX / baseOffsetY : ズームなしの基底値（スプライトCSS配置用）
 function getStageTransform() {
-  const rect = stage.getBoundingClientRect();
+  // stageInner の変換後 rect（ズーム込み、マウス座標変換に使う）
+  const rect = (stageInner || stage).getBoundingClientRect();
   const scaleX = rect.width / LOGICAL_W;
   const scaleY = rect.height / LOGICAL_H;
   const scale = Math.min(scaleX, scaleY);
   const offsetX = (rect.width - LOGICAL_W * scale) / 2;
   const offsetY = (rect.height - LOGICAL_H * scale) / 2;
-  return { rect, scale, offsetX, offsetY };
+
+  // stage の rect（ズームなし、スプライト CSS 配置に使う）
+  const baseRect = stage.getBoundingClientRect();
+  const bScaleX = baseRect.width / LOGICAL_W;
+  const bScaleY = baseRect.height / LOGICAL_H;
+  const baseScale = Math.min(bScaleX, bScaleY);
+  const baseOffsetX = (baseRect.width - LOGICAL_W * baseScale) / 2;
+  const baseOffsetY = (baseRect.height - LOGICAL_H * baseScale) / 2;
+
+  return { rect, scale, offsetX, offsetY, baseRect, baseScale, baseOffsetX, baseOffsetY };
 }
 
 function updateSpritePositions() {
   if (mode !== 'raster' || !charLayer || charObjects.length === 0) return;
 
-  const { scale, offsetX, offsetY } = getStageTransform();
+  // baseScale／baseOffsetX/Y を使う（stageInner のズーム変換はCSSが担うため）
+  const { baseScale: scale, baseOffsetX: offsetX, baseOffsetY: offsetY } = getStageTransform();
 
   charObjects.forEach(obj => {
     const d = obj.data;
@@ -1159,7 +1184,7 @@ function buildCharLayerFromRaster(raster) {
     layerEl.appendChild(img);
   });
 
-  stage.appendChild(layerEl);
+  stageInner.appendChild(layerEl);
   charLayer = layerEl;
   mode = 'raster';
   output.style.visibility = 'hidden';
@@ -1567,7 +1592,7 @@ function setupDrawCanvas() {
     drawCanvas = document.createElement('canvas');
     drawCanvas.className = 'draw-canvas';
     drawCanvas.style.pointerEvents = drawMode ? 'auto' : 'none';
-    stage.appendChild(drawCanvas);
+    stageInner.appendChild(drawCanvas);
 
     drawCtx = drawCanvas.getContext('2d');
     drawCtx.lineCap = 'round';
@@ -1576,9 +1601,9 @@ function setupDrawCanvas() {
     drawCanvas.addEventListener('mousedown', onDrawMouseDown);
   }
 
-  const { rect } = getStageTransform();
-  drawCanvas.width = rect.width;
-  drawCanvas.height = rect.height;
+  const { baseRect } = getStageTransform();
+  drawCanvas.width = baseRect.width;
+  drawCanvas.height = baseRect.height;
 
   redrawStrokes();
 }
@@ -1586,9 +1611,9 @@ function setupDrawCanvas() {
 // ステージリサイズ時などに再描画
 function resizeAndRedrawDrawCanvas() {
   if (!drawCanvas || !drawCtx || mode !== 'raster') return;
-  const { rect } = getStageTransform();
-  drawCanvas.width = rect.width;
-  drawCanvas.height = rect.height;
+  const { baseRect } = getStageTransform();
+  drawCanvas.width = baseRect.width;
+  drawCanvas.height = baseRect.height;
   redrawStrokes();
 }
 
@@ -1602,7 +1627,7 @@ function redrawStrokes() {
 
   const strokes = layers.filter(l => l.kind === 'stroke');
 
-  const { rect, scale, offsetX, offsetY } = getStageTransform();
+  const { baseRect: rect, baseScale: scale, baseOffsetX: offsetX, baseOffsetY: offsetY } = getStageTransform();
   drawCanvas.width = rect.width;
   drawCanvas.height = rect.height;
 
@@ -1724,9 +1749,9 @@ document.addEventListener('mousemove', e => {
     return;
   }
 
-  // オブジェクト移動
+  // オブジェクト移動（視覚スケールを使ってズーム時も正確に動く）
   if (!draggingObj || mode !== 'raster') return;
-  const { rect } = getStageTransform();
+  const { rect } = getStageTransform();  // stageInner の視覚 rect（ズーム込み）
   const scaleX = rect.width / LOGICAL_W;
   const scaleY = rect.height / LOGICAL_H;
 
@@ -1771,7 +1796,7 @@ document.addEventListener('mouseup', () => {
 // ==================================================
 
 stage.addEventListener('dblclick', e => {
-  if (e.target !== stage) return;
+  if (e.target !== stage && e.target !== stageInner) return;
   if (mode !== 'raster') enterRasterMode();
 
   const { rect } = getStageTransform();
@@ -2266,6 +2291,12 @@ window.addEventListener('keydown', e => {
     e.preventDefault();
     toggleFullscreen();
   }
+
+  // Shift+E: エッセイモード切替
+  if (e.shiftKey && (e.key === 'e' || e.key === 'E')) {
+    e.preventDefault();
+    toggleEssayMode();
+  }
 });
 
 
@@ -2286,6 +2317,11 @@ function toggleFullscreen() {
 }
 
 window.addEventListener('resize', () => {
+  if (essayMode) {
+    resizeEssayCanvas();
+    renderEssayCanvas();
+  }
+  renderEssayOnStage();
   updateSpritePositions();
   resizeAndRedrawDrawCanvas();
 });
@@ -2414,3 +2450,470 @@ function saveViewToggles(state) {
     });
   });
 })();
+
+
+// ==================================================
+// エッセイサムネイル描画
+// ==================================================
+
+function renderEssayThumbnail(ctx, W, H, text) {
+  drawEssayGrid(ctx, W, H, text, { padX: 8, padY: 6 });
+}
+
+
+// ==================================================
+// エッセイ内容をステージに表示
+// ==================================================
+
+let essayStageCanvas = null;
+let essayStageCtx = null;
+
+function renderEssayOnStage() {
+  const page = slides[idx];
+  const text = page ? (page.essayText || '') : '';
+
+  if (!text) {
+    // エッセイ内容なし → キャンバスを隠してoutputを戻す
+    if (essayStageCanvas) essayStageCanvas.style.display = 'none';
+    return;
+  }
+
+  // キャンバスを初回作成（stageInner の最背面に挿入）
+  if (!essayStageCanvas) {
+    essayStageCanvas = document.createElement('canvas');
+    essayStageCanvas.className = 'essay-stage-canvas';
+    stageInner.insertBefore(essayStageCanvas, stageInner.firstChild);
+    essayStageCtx = essayStageCanvas.getContext('2d');
+  }
+
+  essayStageCanvas.style.display = 'block';
+  // output テキストは隠す（原稿用紙が代わりに表示）
+  output.style.visibility = 'hidden';
+
+  const { baseRect } = getStageTransform();
+  const W = baseRect.width;
+  const H = baseRect.height;
+  essayStageCanvas.width  = W;
+  essayStageCanvas.height = H;
+
+  drawEssayGrid(essayStageCtx, W, H, text, { padX: 36, padY: 28 });
+}
+
+
+// ==================================================
+// ステージ ズーム / パン
+// ==================================================
+
+let stageZoom = 1.0;
+let stagePanX = 0;
+let stagePanY = 0;
+let isMiddlePanning = false;
+let middlePanStartX = 0, middlePanStartY = 0;
+let middlePanStartPanX = 0, middlePanStartPanY = 0;
+
+function applyStageViewTransform() {
+  if (stageZoom === 1.0 && stagePanX === 0 && stagePanY === 0) {
+    stageInner.style.transform = '';
+  } else {
+    stageInner.style.transform = `translate(${stagePanX}px, ${stagePanY}px) scale(${stageZoom})`;
+  }
+  updateSpritePositions();
+  resizeAndRedrawDrawCanvas();
+}
+
+// カーソル位置を中心にズーム
+// transform-origin: 0 0 想定
+// viewport_x = nLeft + panX + localX * zoom  (nLeft = stageInner native left)
+function zoomStageAt(deltaY, cx, cy) {
+  const factor = deltaY > 0 ? 0.85 : (1 / 0.85);
+  const newZoom = Math.min(8, Math.max(0.1, stageZoom * factor));
+
+  const innerRect = stageInner.getBoundingClientRect();
+  const nLeft = innerRect.left - stagePanX;
+  const nTop  = innerRect.top  - stagePanY;
+
+  // カーソル下のローカル座標（zoom変換前）
+  const lx = (cx - innerRect.left) / stageZoom;
+  const ly = (cy - innerRect.top)  / stageZoom;
+
+  // ズーム後もカーソル位置を固定するようパンを調整
+  stagePanX = cx - nLeft - lx * newZoom;
+  stagePanY = cy - nTop  - ly * newZoom;
+  stageZoom = newZoom;
+
+  applyStageViewTransform();
+}
+
+// Shift+スクロールでズーム（main 要素上）
+document.querySelector('main').addEventListener('wheel', e => {
+  if (!e.shiftKey) return;
+  e.preventDefault();
+  zoomStageAt(e.deltaY, e.clientX, e.clientY);
+}, { passive: false });
+
+// 中ボタン長押しでパン
+document.addEventListener('mousedown', e => {
+  if (e.button !== 1) return;
+  e.preventDefault();
+  isMiddlePanning = true;
+  middlePanStartX = e.clientX;
+  middlePanStartY = e.clientY;
+  middlePanStartPanX = stagePanX;
+  middlePanStartPanY = stagePanY;
+  stage.classList.add('is-panning');
+});
+
+document.addEventListener('mousemove', e => {
+  if (!isMiddlePanning) return;
+  stagePanX = middlePanStartPanX + (e.clientX - middlePanStartX);
+  stagePanY = middlePanStartPanY + (e.clientY - middlePanStartY);
+  applyStageViewTransform();
+});
+
+document.addEventListener('mouseup', e => {
+  if (e.button === 1 && isMiddlePanning) {
+    isMiddlePanning = false;
+    stage.classList.remove('is-panning');
+  }
+});
+
+
+// ==================================================
+// エッセイモード（原稿用紙）
+// ==================================================
+
+let essayMode = false;
+let essayRows = 50;
+let essayCols = 30;
+let essayCursorVisible = true;
+let essayCursorTimer = null;
+let essayToastMsg = '';
+let essayToastTimer = null;
+
+const essayOverlay    = document.getElementById('essayOverlay');
+const essayCanvas     = document.getElementById('essayCanvas');
+const essayCtx        = essayCanvas.getContext('2d');
+const essayHiddenInput = document.getElementById('essayHiddenInput');
+const essayRowsInput  = document.getElementById('essayRowsInput');
+const essayColsInput  = document.getElementById('essayColsInput');
+const essayModeBtn    = document.getElementById('essayModeBtn');
+
+// 設定変更
+essayRowsInput.addEventListener('change', () => {
+  essayRows = Math.max(5, Math.min(50, parseInt(essayRowsInput.value) || 20));
+  essayRowsInput.value = essayRows;
+  if (essayMode) renderEssayCanvas();
+});
+essayColsInput.addEventListener('change', () => {
+  essayCols = Math.max(5, Math.min(50, parseInt(essayColsInput.value) || 20));
+  essayColsInput.value = essayCols;
+  if (essayMode) renderEssayCanvas();
+});
+essayModeBtn.addEventListener('click', toggleEssayMode);
+
+function toggleEssayMode() {
+  if (essayMode) {
+    exitEssayMode();
+  } else {
+    enterEssayMode();
+  }
+}
+
+function enterEssayMode() {
+  essayMode = true;
+  if (!slides[idx].essayText) slides[idx].essayText = '';
+  essayHiddenInput.value = slides[idx].essayText;
+  essayOverlay.classList.remove('essay-hidden');
+  // フルスクリーン要求（失敗しても固定オーバーレイで対応）
+  essayOverlay.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+  // 少し遅延してリサイズ＆描画（fullscreenchange前でも確実に表示）
+  setTimeout(() => {
+    resizeEssayCanvas();
+    renderEssayCanvas();
+    essayHiddenInput.focus();
+  }, 50);
+  // カーソル点滅タイマー
+  essayCursorVisible = true;
+  essayCursorTimer = setInterval(() => {
+    if (!essayMode) return;
+    essayCursorVisible = !essayCursorVisible;
+    renderEssayCanvas();
+  }, 530);
+}
+
+function exitEssayMode() {
+  if (!essayMode) return;
+  essayMode = false;
+  clearInterval(essayCursorTimer);
+  essayCursorTimer = null;
+  slides[idx].essayText = essayHiddenInput.value;
+  essayOverlay.classList.add('essay-hidden');
+  if (document.fullscreenElement) {
+    document.exitFullscreen().catch(() => {});
+  }
+  persist();
+  renderEssayOnStage();
+}
+
+function resizeEssayCanvas() {
+  essayCanvas.width  = essayOverlay.clientWidth  || window.innerWidth;
+  essayCanvas.height = essayOverlay.clientHeight || window.innerHeight;
+}
+
+// 文字インデックス → (col, row) 変換（縦書き：右列から左列へ）
+function essayCharToCell(text, charIdx) {
+  let col = 0, row = 0;
+  for (let i = 0; i < charIdx; i++) {
+    if (text[i] === '\n') {
+      col++;
+      row = 0;
+    } else {
+      row++;
+      if (row >= essayRows) {
+        row = 0;
+        col++;
+      }
+    }
+  }
+  return { col, row };
+}
+
+// 共通グリッド描画（オーバーレイ・ステージ・サムネイル共用）
+// options: { padX, padY, showCursor, cursorIdx, cursorVisible }
+function drawEssayGrid(ctx, W, H, text, options = {}) {
+  const { padX = 80, padY = 56, showCursor = false, cursorIdx = 0, cursorVisible = false } = options;
+  const rows = essayRows;
+  const cols = essayCols;
+
+  const cellSize = Math.floor(Math.min((W - padX * 2) / cols, (H - padY * 2) / rows));
+  if (cellSize < 1) return;
+  const gridW = cellSize * cols;
+  const gridH = cellSize * rows;
+  const startX = Math.floor((W - gridW) / 2);
+  const startY = Math.floor((H - gridH) / 2);
+
+  // 背景（和紙色）
+  ctx.fillStyle = '#fffef5';
+  ctx.fillRect(0, 0, W, H);
+
+  // 外枠（太線）
+  ctx.strokeStyle = '#111';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(startX, startY, gridW, gridH);
+
+  // 内部グリッド線
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 0.7;
+  for (let c = 1; c < cols; c++) {
+    const x = startX + c * cellSize;
+    ctx.beginPath(); ctx.moveTo(x, startY); ctx.lineTo(x, startY + gridH); ctx.stroke();
+  }
+  for (let r = 1; r < rows; r++) {
+    const y = startY + r * cellSize;
+    ctx.beginPath(); ctx.moveTo(startX, y); ctx.lineTo(startX + gridW, y); ctx.stroke();
+  }
+
+  // テキスト（縦書き：右列から左列へ）
+  const fs = Math.floor(cellSize * 0.72);
+  ctx.font = `500 ${fs}px 'Noto Sans JP', sans-serif`;
+  ctx.fillStyle = '#111';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  let ci = 0;
+  for (let c = 0; c < cols; c++) {
+    for (let r = 0; r < rows; ) {
+      if (ci >= text.length) break;
+      const ch = text[ci];
+      if (ch === '\n') { ci++; break; }
+      ctx.fillText(ch, startX + (cols - 1 - c) * cellSize + cellSize / 2, startY + r * cellSize + cellSize / 2);
+      ci++; r++;
+    }
+    if (ci >= text.length) break;
+  }
+
+  // カーソル（セル上端の水平線）
+  if (showCursor && cursorVisible) {
+    const { col: curCol, row: curRow } = essayCharToCell(text, cursorIdx);
+    if (curCol < cols && curRow <= rows) {
+      const cx = startX + (cols - 1 - curCol) * cellSize;
+      const cy = startY + curRow * cellSize;
+      ctx.strokeStyle = '#1e88e5';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(cx + 3, cy + 2);
+      ctx.lineTo(cx + cellSize - 3, cy + 2);
+      ctx.stroke();
+    }
+  }
+}
+
+function renderEssayCanvas() {
+  const W   = essayCanvas.width;
+  const H   = essayCanvas.height;
+  const ctx = essayCtx;
+  const text = essayHiddenInput.value;
+
+  drawEssayGrid(ctx, W, H, text, {
+    padX: 80, padY: 56,
+    showCursor: true,
+    cursorIdx: essayHiddenInput.selectionStart || 0,
+    cursorVisible: essayCursorVisible
+  });
+
+  // 下部ヒント
+  const charCount = text.replace(/\n/g, '').length;
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.font = '12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(`${charCount} 字  /  Shift+E または Esc で終了`, W / 2, H - 12);
+
+  // トースト通知（ページ追加メッセージ）
+  if (essayToastMsg) {
+    const rows = essayRows;
+    const cols = essayCols;
+    const cellSize = Math.floor(Math.min((W - 80 * 2) / cols, (H - 56 * 2) / rows));
+    const startY = Math.floor((H - cellSize * rows) / 2);
+    const tw = ctx.measureText(essayToastMsg).width + 32;
+    const th = 36;
+    const tx = (W - tw) / 2;
+    const ty = startY - th - 12;
+    ctx.fillStyle = 'rgba(30,136,229,0.92)';
+    ctx.beginPath();
+    ctx.roundRect(tx, ty, tw, th, 8);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(essayToastMsg, W / 2, ty + th / 2);
+  }
+}
+
+// テキストを1ページ分ずつ分割する
+// 縦書き：列 cols 本 × 行 rows 文字。\n は列送りとして扱う
+function splitEssayText(text, rows, cols) {
+  const pages = [];
+  let i = 0;
+  while (i < text.length) {
+    let pageText = '';
+    let col = 0, row = 0;
+    while (i < text.length && col < cols) {
+      const ch = text[i];
+      pageText += ch;
+      i++;
+      if (ch === '\n') {
+        col++;
+        row = 0;
+      } else {
+        row++;
+        if (row >= rows) {
+          col++;
+          row = 0;
+        }
+      }
+    }
+    pages.push(pageText);
+  }
+  return pages;
+}
+
+// ペースト後のオーバーフロー処理
+function handleEssayOverflow() {
+  const text = essayHiddenInput.value;
+  const pages = splitEssayText(text, essayRows, essayCols);
+
+  if (pages.length <= 1) {
+    // オーバーフローなし：通常保存
+    slides[idx].essayText = text;
+    essayCursorVisible = true;
+    renderEssayCanvas();
+    persist();
+    return;
+  }
+
+  // Undo ポイントを積む
+  pushUndoState();
+
+  // 現在ページに収まる分だけ設定
+  slides[idx].essayText = pages[0];
+  essayHiddenInput.value = pages[0];
+
+  // 残りのページを現在ページの直後に挿入
+  for (let p = pages.length - 1; p >= 1; p--) {
+    slides.splice(idx + p, 0, { text: '', raster: null, name: '', essayText: pages[p] });
+  }
+
+  // トースト表示
+  const added = pages.length - 1;
+  essayToastMsg = `${added} ページ追加しました`;
+  clearTimeout(essayToastTimer);
+  essayToastTimer = setTimeout(() => {
+    essayToastMsg = '';
+    renderEssayCanvas();
+  }, 2500);
+
+  essayCursorVisible = true;
+  renderEssayCanvas();
+  renderRail();
+  persist();
+}
+
+// ペーストイベント：input 発火後にオーバーフロー確認
+let essayIsPasting = false;
+essayHiddenInput.addEventListener('paste', () => {
+  essayIsPasting = true;
+  setTimeout(() => {
+    essayIsPasting = false;
+    handleEssayOverflow();
+  }, 0);
+});
+
+// 入力イベント（ペースト中は handleEssayOverflow に委譲）
+essayHiddenInput.addEventListener('input', () => {
+  if (essayIsPasting) return;
+  slides[idx].essayText = essayHiddenInput.value;
+  essayCursorVisible = true;
+  renderEssayCanvas();
+  renderEssayOnStage();
+  persist();
+});
+
+essayHiddenInput.addEventListener('keydown', e => {
+  if (e.key === 'Escape' || (e.shiftKey && (e.key === 'e' || e.key === 'E'))) {
+    e.preventDefault();
+    exitEssayMode();
+    return;
+  }
+  // カーソル移動後に再描画
+  requestAnimationFrame(() => renderEssayCanvas());
+});
+
+essayHiddenInput.addEventListener('keyup', () => {
+  renderEssayCanvas();
+});
+
+// オーバーレイクリックでフォーカス
+essayOverlay.addEventListener('click', () => {
+  essayHiddenInput.focus();
+});
+
+// フルスクリーン変更（エッセイモード用）
+document.addEventListener('fullscreenchange', () => {
+  if (essayMode) {
+    if (!document.fullscreenElement) {
+      // Esc でフルスクリーン終了
+      exitEssayMode();
+    } else {
+      resizeEssayCanvas();
+      renderEssayCanvas();
+      essayHiddenInput.focus();
+    }
+  }
+});
+document.addEventListener('webkitfullscreenchange', () => {
+  if (essayMode) {
+    resizeEssayCanvas();
+    renderEssayCanvas();
+  }
+});

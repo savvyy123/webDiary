@@ -152,6 +152,25 @@ main {
   padding-top: 24px;
 }
 
+/* ステージ内部ズーム／パンレイヤー */
+.stage-inner {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}
+
+/* エッセイ原稿用紙（ステージ上の最背面レイヤー） */
+.essay-stage-canvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.stage.is-panning,
+.stage.is-panning * {
+  cursor: grabbing !important;
+}
+
 .text {
   writing-mode: vertical-rl;
   text-orientation: mixed;
@@ -720,6 +739,79 @@ footer {
     font-size: 10px;
     padding: 2px 6px;
   }
+}
+
+/* =========================================
+   エッセイモード
+========================================= */
+#essayOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: #fffef5;
+  overflow: hidden;
+}
+
+#essayOverlay.essay-hidden {
+  display: none !important;
+}
+
+#essayCanvas {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+#essayHiddenInput {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  opacity: 0;
+  cursor: text;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  caret-color: transparent;
+  font-size: 16px;
+  color: transparent;
+}
+
+/* ===== ESSAY OBJ パネル ===== */
+.essay-size-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.essay-size-label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.essay-size-input {
+  width: 64px;
+  padding: 5px 6px;
+  border-radius: 7px;
+  border: 1px solid #0002;
+  font-size: 13px;
+  background: #fff;
+}
+
+.essay-open-btn {
+  width: 100%;
+  margin-bottom: 6px;
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+.essay-open-btn:hover {
+  background: #333;
 }
 
 /* --- 高さが足りない場合（横向きスマホ等） --- */

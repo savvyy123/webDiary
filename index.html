@@ -53,9 +53,12 @@
   <div class="content-wrap">
     <main>
       <div class="stage">
-        <div id="output" class="text">文字を視る</div>
-        <div class="badge" id="badge">01</div>
-        <!-- ラスタライズレイヤーと手書きキャンバスは JS で追加 -->
+        <!-- ズーム／パン変換はこの内部レイヤーに適用 -->
+        <div id="stageInner" class="stage-inner">
+          <div id="output" class="text">文字を視る</div>
+          <div class="badge" id="badge">01</div>
+          <!-- ラスタライズレイヤーと手書きキャンバスは JS で追加 -->
+        </div>
       </div>
     </main>
 
@@ -139,6 +142,26 @@
         自動的に位置がそろいます。
       </p>
     </div>
+
+    <!-- ESSAY -->
+    <div class="object-panel-section">
+      <div class="object-panel-title">ESSAY</div>
+      <div class="essay-size-row">
+        <label class="essay-size-label">
+          行数
+          <input id="essayRowsInput" type="number" min="5" max="50" value="50" class="essay-size-input" />
+        </label>
+        <label class="essay-size-label">
+          列数
+          <input id="essayColsInput" type="number" min="5" max="50" value="30" class="essay-size-input" />
+        </label>
+      </div>
+      <button id="essayModeBtn" class="essay-open-btn" type="button">原稿用紙を開く</button>
+      <p class="object-hint">
+        Shift+E でモード切替 / Esc で終了<br />
+        行数・列数で原稿用紙のマス目を変更できます。
+      </p>
+    </div>
   </aside>
 
   <!-- ===== レイヤーパネル（右上） ===== -->
@@ -159,9 +182,17 @@
 
   <footer id="appFooter">
     サムネイルクリックでページジャンプ / ←→ でページ送り /
-    <strong>Fでページだけフルスクリーン</strong> / Sでサイズ編集モード /
-    Ctrl+Z / Ctrl+Shift+Z でUndo/Redo
+    <strong>Fでページだけフルスクリーン</strong> /
+    <strong>Shift+E でエッセイモード（原稿用紙）</strong> /
+    <strong>Shift+スクロールでズーム / 中ボタン長押しでパン</strong> /
+    Sでサイズ編集モード / Ctrl+Z / Ctrl+Shift+Z でUndo/Redo
   </footer>
+
+  <!-- ===== エッセイモード オーバーレイ ===== -->
+  <div id="essayOverlay" class="essay-hidden">
+    <canvas id="essayCanvas"></canvas>
+    <textarea id="essayHiddenInput" autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
+  </div>
 
   <script src="js/app.js"></script>
 </body>
