@@ -1629,10 +1629,12 @@ function redrawStrokes() {
   const strokes = layers.filter(l => l.kind === 'stroke');
 
   const { baseRect: rect, baseScale: scale, baseOffsetX: offsetX, baseOffsetY: offsetY } = getStageTransform();
-  drawCanvas.width = rect.width;
-  drawCanvas.height = rect.height;
+  const dpr = window.devicePixelRatio || 1;
+  drawCanvas.width  = Math.round(rect.width  * dpr);
+  drawCanvas.height = Math.round(rect.height * dpr);
+  drawCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+  drawCtx.clearRect(0, 0, rect.width, rect.height);
   drawCtx.lineCap = 'round';
   drawCtx.lineJoin = 'round';
 
@@ -2536,10 +2538,12 @@ function renderEssayOnStage() {
   output.style.visibility = 'hidden';
 
   const { baseRect } = getStageTransform();
+  const dpr = window.devicePixelRatio || 1;
   const W = baseRect.width;
   const H = baseRect.height;
-  essayStageCanvas.width  = W;
-  essayStageCanvas.height = H;
+  essayStageCanvas.width  = Math.round(W * dpr);
+  essayStageCanvas.height = Math.round(H * dpr);
+  essayStageCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   drawEssayGrid(essayStageCtx, W, H, text, { padX: 36, padY: 28 });
 }
@@ -2669,8 +2673,13 @@ function enterEssayMode() {
   if (!slides[idx].essayText) slides[idx].essayText = '';
   essayHiddenInput.value = slides[idx].essayText;
   essayOverlay.classList.remove('essay-hidden');
-  // フルスクリーン要求（失敗しても固定オーバーレイで対応）
-  essayOverlay.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+  // ステージがフルスクリーン中の場合はオーバーレイをその要素内に移動して表示
+  if (document.fullscreenElement && document.fullscreenElement !== essayOverlay) {
+    document.fullscreenElement.appendChild(essayOverlay);
+  } else {
+    // 通常時: オーバーレイ自体をフルスクリーンにする
+    essayOverlay.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+  }
   // 少し遅延してリサイズ＆描画（fullscreenchange前でも確実に表示）
   setTimeout(() => {
     resizeEssayCanvas();
@@ -2693,7 +2702,10 @@ function exitEssayMode() {
   essayCursorTimer = null;
   slides[idx].essayText = essayHiddenInput.value;
   essayOverlay.classList.add('essay-hidden');
-  if (document.fullscreenElement) {
+  // フルスクリーン中にオーバーレイを別要素内に移動していた場合は body 直下に戻す
+  if (essayOverlay.parentElement !== document.body) {
+    document.body.appendChild(essayOverlay);
+  } else if (document.fullscreenElement === essayOverlay) {
     document.exitFullscreen().catch(() => {});
   }
   persist();
@@ -2701,8 +2713,13 @@ function exitEssayMode() {
 }
 
 function resizeEssayCanvas() {
-  essayCanvas.width  = essayOverlay.clientWidth  || window.innerWidth;
-  essayCanvas.height = essayOverlay.clientHeight || window.innerHeight;
+  const dpr = window.devicePixelRatio || 1;
+  const W = essayOverlay.clientWidth  || window.innerWidth;
+  const H = essayOverlay.clientHeight || window.innerHeight;
+  essayCanvas.width  = Math.round(W * dpr);
+  essayCanvas.height = Math.round(H * dpr);
+  essayCanvas.style.width  = W + 'px';
+  essayCanvas.style.height = H + 'px';
 }
 
 // 文字インデックス → (col, row) 変換（縦書き：右列から左列へ）
@@ -2747,19 +2764,20 @@ function drawVerticalChar(ctx, ch, cellX, cellY, cellSize) {
   const cy = cellY + cellSize / 2;
 
   if (ESSAY_PUNCT_CORNER.has(ch)) {
-    // 句読点: 右上 1/4 の位置（セル右端・上端寄り）
+    // 句読点: フォントを約40%に縮小してセル右上隅に配置
+    // (textAlign='center', textBaseline='middle' は外側で設定済み)
+    const pSize = Math.max(3, Math.floor(cellSize * 0.45));
     ctx.save();
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(ch, cellX + cellSize * 0.73, cellY + cellSize * 0.27);
+    ctx.font = ctx.font.replace(/\d+(\.\d+)?px/, pSize + 'px');
+    // 中心を「右上隅から pSize/2 内側」に置くことで
+    // グリフがセル右端・上端にぴったり収まる
+    ctx.fillText(ch, cellX + cellSize - pSize / 2, cellY + pSize / 2);
     ctx.restore();
   } else if (ESSAY_ROTATE_CW.has(ch)) {
     // 棒線・括弧等: 90°時計回りに回転してセル中央に描画
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(Math.PI / 2);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
     ctx.fillText(ch, 0, 0);
     ctx.restore();
   } else {
@@ -2840,9 +2858,11 @@ function drawEssayGrid(ctx, W, H, text, options = {}) {
 }
 
 function renderEssayCanvas() {
-  const W   = essayCanvas.width;
-  const H   = essayCanvas.height;
+  const dpr = window.devicePixelRatio || 1;
+  const W   = Math.round(essayCanvas.width  / dpr);
+  const H   = Math.round(essayCanvas.height / dpr);
   const ctx = essayCtx;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const text = essayHiddenInput.value;
 
   drawEssayGrid(ctx, W, H, text, {
