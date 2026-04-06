@@ -2723,6 +2723,51 @@ function essayCharToCell(text, charIdx) {
   return { col, row };
 }
 
+// ===== 縦書き原稿用紙の特殊文字配置 =====
+
+// 句読点: セルの右上隅に配置（原稿用紙の慣習）
+const ESSAY_PUNCT_CORNER = new Set(['。', '、', '．', '，']);
+
+// 90°時計回りに回転が必要な文字
+const ESSAY_ROTATE_CW = new Set([
+  'ー', '―', '─', '—', '─', '〜', '～',   // 棒線・波線
+  '…', '‥',                                 // 三点リーダ
+  '！', '？', '!', '?',                     // 感嘆符・疑問符
+  '（', '）', '【', '】',                    // 丸・角括弧
+  '〔', '〕', '〈', '〉', '《', '》',        // 各種括弧
+  '｛', '｝', '〝', '〟',                   // 波括弧・引用符
+]);
+
+/**
+ * 縦書き原稿用紙用の1文字描画
+ * ctx の font / fillStyle は呼び出し前に設定しておくこと
+ */
+function drawVerticalChar(ctx, ch, cellX, cellY, cellSize) {
+  const cx = cellX + cellSize / 2;
+  const cy = cellY + cellSize / 2;
+
+  if (ESSAY_PUNCT_CORNER.has(ch)) {
+    // 句読点: 右上 1/4 の位置（セル右端・上端寄り）
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(ch, cellX + cellSize * 0.73, cellY + cellSize * 0.27);
+    ctx.restore();
+  } else if (ESSAY_ROTATE_CW.has(ch)) {
+    // 棒線・括弧等: 90°時計回りに回転してセル中央に描画
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(ch, 0, 0);
+    ctx.restore();
+  } else {
+    // 通常文字: セル中央
+    ctx.fillText(ch, cx, cy);
+  }
+}
+
 // 共通グリッド描画（オーバーレイ・ステージ・サムネイル共用）
 // options: { padX, padY, showCursor, cursorIdx, cursorVisible }
 function drawEssayGrid(ctx, W, H, text, options = {}) {
@@ -2770,7 +2815,9 @@ function drawEssayGrid(ctx, W, H, text, options = {}) {
       if (ci >= text.length) break;
       const ch = text[ci];
       if (ch === '\n') { ci++; break; }
-      ctx.fillText(ch, startX + (cols - 1 - c) * cellSize + cellSize / 2, startY + r * cellSize + cellSize / 2);
+      const cellX = startX + (cols - 1 - c) * cellSize;
+      const cellY = startY + r * cellSize;
+      drawVerticalChar(ctx, ch, cellX, cellY, cellSize);
       ci++; r++;
     }
     if (ci >= text.length) break;
