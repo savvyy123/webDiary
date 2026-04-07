@@ -2343,7 +2343,12 @@ window.addEventListener('keydown', e => {
 
   if (e.key === 'f' || e.key === 'F') {
     e.preventDefault();
-    toggleFullscreen();
+    // 原稿用紙ページでは F = Shift+E と同じ（エッセイモード切替）
+    if (slides[idx] && slides[idx].essayText != null && slides[idx].essayText !== '') {
+      toggleEssayMode();
+    } else {
+      toggleFullscreen();
+    }
   }
 
   // Shift+E: エッセイモード切替
