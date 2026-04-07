@@ -2731,11 +2731,9 @@ function exitEssayMode() {
 
 function resizeEssayCanvas() {
   const dpr = window.devicePixelRatio || 1;
-  // getBoundingClientRect でフルスクリーン後の実 CSS サイズを取得
-  // （canvas.width 属性値が大きいと Safari は固有サイズを優先するため clientWidth は使わない）
-  const rect = essayCanvas.getBoundingClientRect();
-  const W = rect.width  || essayOverlay.clientWidth  || window.innerWidth;
-  const H = rect.height || essayOverlay.clientHeight || window.innerHeight;
+  // window.innerWidth/Height は常にビューポートの CSS px を返す（fullscreen 後も正確）
+  const W = window.innerWidth;
+  const H = window.innerHeight;
   essayCanvas.width  = Math.round(W * dpr);
   essayCanvas.height = Math.round(H * dpr);
 }
