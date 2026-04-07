@@ -48,6 +48,9 @@ async function idbLoad() {
 const LOGICAL_W = 1080;
 const LOGICAL_H = 720;
 
+// Mac（Retina）では OBJ 初期サイズを一回り小さく
+const OBJ_SIZE_SCALE = /Macintosh|Mac OS X/.test(navigator.userAgent) ? 0.75 : 1.0;
+
 // サムネイルサイズ
 const THUMB_W = 200;
 const THUMB_H = 133;
@@ -1205,7 +1208,7 @@ function enterRasterMode() {
   commitInline();
   const page = slides[idx];
   const text = page.text || '';
-  const fs = Number(fontSize.value) || 64;
+  const fs = (Number(fontSize.value) || 64) * OBJ_SIZE_SCALE;
 
   if (page.raster && getRasterItems(page.raster).length) {
     ensureRaster(page);
@@ -1287,7 +1290,7 @@ function insertImageAt(logicX, logicY, dataUrl) {
     const nw = tmpImg.naturalWidth || 200;
     const nh = tmpImg.naturalHeight || 200;
 
-    const maxSize = 280;
+    const maxSize = 280 * OBJ_SIZE_SCALE;
     const scale = Math.min(maxSize / nw, maxSize / nh, 1);
     const baseW = nw * scale;
     const baseH = nh * scale;
@@ -1335,8 +1338,8 @@ function addShape(type) {
   const page = slides[idx];
   const raster = ensureRaster(page);
 
-  let baseW = 220;
-  let baseH = 220;
+  let baseW = Math.round(220 * OBJ_SIZE_SCALE);
+  let baseH = Math.round(220 * OBJ_SIZE_SCALE);
   let logicX;
   let logicY;
 
@@ -1377,7 +1380,7 @@ function addTextboxFromTool() {
   const page = slides[idx];
   const raster = ensureRaster(page);
 
-  const fs = 48;
+  const fs = Math.round(48 * OBJ_SIZE_SCALE);
   const baseH = fs * 1.6;
   const baseW = fs * text.length * 0.8 + 40;
 
