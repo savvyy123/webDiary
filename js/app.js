@@ -1630,8 +1630,10 @@ function redrawStrokes() {
 
   const { baseRect: rect, baseScale: scale, baseOffsetX: offsetX, baseOffsetY: offsetY } = getStageTransform();
   const dpr = window.devicePixelRatio || 1;
-  drawCanvas.width  = Math.round(rect.width  * dpr);
-  drawCanvas.height = Math.round(rect.height * dpr);
+  drawCanvas.width        = Math.round(rect.width  * dpr);
+  drawCanvas.height       = Math.round(rect.height * dpr);
+  drawCanvas.style.width  = rect.width  + 'px';
+  drawCanvas.style.height = rect.height + 'px';
   drawCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   drawCtx.clearRect(0, 0, rect.width, rect.height);
@@ -2541,8 +2543,10 @@ function renderEssayOnStage() {
   const dpr = window.devicePixelRatio || 1;
   const W = baseRect.width;
   const H = baseRect.height;
-  essayStageCanvas.width  = Math.round(W * dpr);
-  essayStageCanvas.height = Math.round(H * dpr);
+  essayStageCanvas.width        = Math.round(W * dpr);
+  essayStageCanvas.height       = Math.round(H * dpr);
+  essayStageCanvas.style.width  = W + 'px';
+  essayStageCanvas.style.height = H + 'px';
   essayStageCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   drawEssayGrid(essayStageCtx, W, H, text, { padX: 36, padY: 28 });
