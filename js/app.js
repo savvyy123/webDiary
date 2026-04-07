@@ -2682,19 +2682,39 @@ function enterEssayMode() {
   if (!slides[idx].essayText) slides[idx].essayText = '';
   essayHiddenInput.value = slides[idx].essayText;
   essayOverlay.classList.remove('essay-hidden');
+
   // ステージがフルスクリーン中の場合はオーバーレイをその要素内に移動して表示
   if (document.fullscreenElement && document.fullscreenElement !== essayOverlay) {
     document.fullscreenElement.appendChild(essayOverlay);
+    // 既にフルスクリーン確立済み → すぐ描画
+    setTimeout(() => {
+      resizeEssayCanvas();
+      renderEssayCanvas();
+      essayHiddenInput.focus();
+    }, 30);
   } else {
-    // 通常時: オーバーレイ自体をフルスクリーンにする
-    essayOverlay.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+    // フルスクリーン確立後（fullscreenchange）に描画（Mac Safari は遷移が遅い）
+    const onFS = () => {
+      document.removeEventListener('fullscreenchange', onFS);
+      document.removeEventListener('webkitfullscreenchange', onFS);
+      resizeEssayCanvas();
+      renderEssayCanvas();
+      essayHiddenInput.focus();
+    };
+    document.addEventListener('fullscreenchange', onFS);
+    document.addEventListener('webkitfullscreenchange', onFS);
+    essayOverlay.requestFullscreen({ navigationUI: 'hide' }).catch(() => {
+      // フルスクリーン失敗時はフォールバック描画
+      document.removeEventListener('fullscreenchange', onFS);
+      document.removeEventListener('webkitfullscreenchange', onFS);
+      setTimeout(() => {
+        resizeEssayCanvas();
+        renderEssayCanvas();
+        essayHiddenInput.focus();
+      }, 50);
+    });
   }
-  // 少し遅延してリサイズ＆描画（fullscreenchange前でも確実に表示）
-  setTimeout(() => {
-    resizeEssayCanvas();
-    renderEssayCanvas();
-    essayHiddenInput.focus();
-  }, 50);
+
   // カーソル点滅タイマー
   essayCursorVisible = true;
   essayCursorTimer = setInterval(() => {
@@ -2723,12 +2743,11 @@ function exitEssayMode() {
 
 function resizeEssayCanvas() {
   const dpr = window.devicePixelRatio || 1;
+  // CSS 表示サイズは position:absolute; inset:0 が制御するので style.width/height は設定しない
   const W = essayOverlay.clientWidth  || window.innerWidth;
   const H = essayOverlay.clientHeight || window.innerHeight;
   essayCanvas.width  = Math.round(W * dpr);
   essayCanvas.height = Math.round(H * dpr);
-  essayCanvas.style.width  = W + 'px';
-  essayCanvas.style.height = H + 'px';
 }
 
 // 文字インデックス → (col, row) 変換（縦書き：右列から左列へ）
