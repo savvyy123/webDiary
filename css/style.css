@@ -814,6 +814,29 @@ footer {
   background: #333;
 }
 
+/* =========================================
+   Mac 用 UI 縮小
+========================================= */
+body.mac .toolbar {
+  zoom: 0.88;
+  transform-origin: top left;
+}
+
+body.mac .view-toggle-bar {
+  zoom: 0.88;
+}
+
+body.mac .object-panel,
+body.mac .layers-panel,
+body.mac .code-panel {
+  zoom: 0.85;
+}
+
+body.mac .railWrap {
+  zoom: 0.88;
+  width: 137px; /* 152 × 0.88 ≈ 134、少し余裕を持たせる */
+}
+
 /* --- 高さが足りない場合（横向きスマホ等） --- */
 @media (max-height: 500px) {
   .stage {

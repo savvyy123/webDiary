@@ -48,8 +48,10 @@ async function idbLoad() {
 const LOGICAL_W = 1080;
 const LOGICAL_H = 720;
 
-// Mac（Retina）では OBJ 初期サイズを一回り小さく
-const OBJ_SIZE_SCALE = /Macintosh|Mac OS X/.test(navigator.userAgent) ? 0.75 : 1.0;
+// Mac（Retina）では OBJ 初期サイズ・UI を一回り小さく
+const isMac = /Macintosh|Mac OS X/.test(navigator.userAgent);
+const OBJ_SIZE_SCALE = isMac ? 0.75 : 1.0;
+if (isMac) document.body.classList.add('mac');
 
 // サムネイルサイズ
 const THUMB_W = 200;
