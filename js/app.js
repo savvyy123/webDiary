@@ -2683,37 +2683,28 @@ function enterEssayMode() {
   essayHiddenInput.value = slides[idx].essayText;
   essayOverlay.classList.remove('essay-hidden');
 
-  // ステージがフルスクリーン中の場合はオーバーレイをその要素内に移動して表示
-  if (document.fullscreenElement && document.fullscreenElement !== essayOverlay) {
-    document.fullscreenElement.appendChild(essayOverlay);
-    // 既にフルスクリーン確立済み → すぐ描画
+  // 常に essayOverlay をフルスクリーンにする
+  // stage がフルスクリーン中の場合もブラウザが自動解除してから切り替える
+  const onFS = () => {
+    document.removeEventListener('fullscreenchange', onFS);
+    document.removeEventListener('webkitfullscreenchange', onFS);
+    resizeEssayCanvas();
+    renderEssayCanvas();
+    essayHiddenInput.focus();
+  };
+  document.addEventListener('fullscreenchange', onFS);
+  document.addEventListener('webkitfullscreenchange', onFS);
+
+  essayOverlay.requestFullscreen({ navigationUI: 'hide' }).catch(() => {
+    // フルスクリーン失敗時（権限なし等）はオーバーレイ表示のままフォールバック
+    document.removeEventListener('fullscreenchange', onFS);
+    document.removeEventListener('webkitfullscreenchange', onFS);
     setTimeout(() => {
       resizeEssayCanvas();
       renderEssayCanvas();
       essayHiddenInput.focus();
-    }, 30);
-  } else {
-    // フルスクリーン確立後（fullscreenchange）に描画（Mac Safari は遷移が遅い）
-    const onFS = () => {
-      document.removeEventListener('fullscreenchange', onFS);
-      document.removeEventListener('webkitfullscreenchange', onFS);
-      resizeEssayCanvas();
-      renderEssayCanvas();
-      essayHiddenInput.focus();
-    };
-    document.addEventListener('fullscreenchange', onFS);
-    document.addEventListener('webkitfullscreenchange', onFS);
-    essayOverlay.requestFullscreen({ navigationUI: 'hide' }).catch(() => {
-      // フルスクリーン失敗時はフォールバック描画
-      document.removeEventListener('fullscreenchange', onFS);
-      document.removeEventListener('webkitfullscreenchange', onFS);
-      setTimeout(() => {
-        resizeEssayCanvas();
-        renderEssayCanvas();
-        essayHiddenInput.focus();
-      }, 50);
-    });
-  }
+    }, 50);
+  });
 
   // カーソル点滅タイマー
   essayCursorVisible = true;
@@ -2731,10 +2722,7 @@ function exitEssayMode() {
   essayCursorTimer = null;
   slides[idx].essayText = essayHiddenInput.value;
   essayOverlay.classList.add('essay-hidden');
-  // フルスクリーン中にオーバーレイを別要素内に移動していた場合は body 直下に戻す
-  if (essayOverlay.parentElement !== document.body) {
-    document.body.appendChild(essayOverlay);
-  } else if (document.fullscreenElement === essayOverlay) {
+  if (document.fullscreenElement) {
     document.exitFullscreen().catch(() => {});
   }
   persist();
