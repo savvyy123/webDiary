@@ -179,6 +179,13 @@ window.addEventListener('keydown', e => {
     return;
   }
 
+  // Shift+Ctrl+K: キャンバス設定モーダル
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'k' || e.key === 'K')) {
+    e.preventDefault();
+    openCanvasSettings();
+    return;
+  }
+
   // S: サイズ編集モード切り替え
   if ((e.key === 's' || e.key === 'S') && !isInput && !isEditable && document.activeElement !== toolTextInput) {
     e.preventDefault();
@@ -247,15 +254,33 @@ window.addEventListener('keydown', e => {
 
 // ===== フルスクリーン =====
 
-function toggleFullscreen() {
+async function toggleFullscreen() {
+  const overlay = document.getElementById('fullscreenOverlay');
+  const img     = document.getElementById('fullscreenImg');
+  if (!overlay || !img) return;
+
   if (!document.fullscreenElement) {
-    if (stage && stage.requestFullscreen) {
-      stage.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+    try {
+      const canvas = await renderSlideToCanvas(idx);
+      img.src = canvas.toDataURL('image/png');
+    } catch (_) { return; }
+    overlay.classList.remove('fullscreen-hidden');
+    if (overlay.requestFullscreen) {
+      overlay.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
     }
   } else {
     if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
   }
 }
+
+// フルスクリーン解除時にオーバーレイを閉じる
+function _handleFSChange() {
+  const overlay = document.getElementById('fullscreenOverlay');
+  if (!overlay) return;
+  if (!document.fullscreenElement) overlay.classList.add('fullscreen-hidden');
+}
+document.addEventListener('fullscreenchange', _handleFSChange);
+document.addEventListener('webkitfullscreenchange', _handleFSChange);
 
 window.addEventListener('resize', () => {
   if (essayMode) { resizeEssayCanvas(); renderEssayCanvas(); }
@@ -273,64 +298,84 @@ document.addEventListener('webkitfullscreenchange', () => {
   resizeAndRedrawDrawCanvas();
 });
 
-// ===== ズーム / パン =====
+// ===== 本体ディスプレイの移動 / 拡大 =====
+// stageInner（出力矩形）を .stage 内で自由に移動・ズームする。
+// stageZoom / stagePanX / stagePanY は「contain 基準サイズからの追加変換」。
+
+function fitInnerToStage() {
+  // .stage 内に contain する stageInner の基底サイズを決定
+  const sRect = stage.getBoundingClientRect();
+  if (sRect.width === 0 || sRect.height === 0) return;
+  const targetRatio = LOGICAL_W / LOGICAL_H;
+  let w = sRect.width;
+  let h = w / targetRatio;
+  if (h > sRect.height) { h = sRect.height; w = h * targetRatio; }
+  stageInner.style.width  = w + 'px';
+  stageInner.style.height = h + 'px';
+  applyStageViewTransform();
+}
 
 function applyStageViewTransform() {
-  stageInner.style.transform = (stageZoom === 1.0 && stagePanX === 0 && stagePanY === 0)
-    ? ''
-    : `translate(${stagePanX}px, ${stagePanY}px) scale(${stageZoom})`;
+  // 中央寄せ (-50%, -50%) → pan → 中央基準の scale
+  stageInner.style.transform =
+    `translate(-50%, -50%) translate(${stagePanX}px, ${stagePanY}px) scale(${stageZoom})`;
   updateSpritePositions();
   resizeAndRedrawDrawCanvas();
 }
 
 function zoomStageAt(deltaY, cx, cy) {
-  const factor  = deltaY > 0 ? 0.85 : (1 / 0.85);
-  const newZoom = Math.min(8, Math.max(0.1, stageZoom * factor));
-
+  const factor  = deltaY > 0 ? 0.9 : (1 / 0.9);
+  const newZoom = Math.min(8, Math.max(0.2, stageZoom * factor));
+  // ポインタ下の点を固定してズーム
   const innerRect = stageInner.getBoundingClientRect();
-  const nLeft = innerRect.left - stagePanX;
-  const nTop  = innerRect.top  - stagePanY;
   const lx = (cx - innerRect.left) / stageZoom;
   const ly = (cy - innerRect.top)  / stageZoom;
-
-  stagePanX = cx - nLeft - lx * newZoom;
-  stagePanY = cy - nTop  - ly * newZoom;
-  stageZoom = newZoom;
+  const newLeft = cx - lx * newZoom;
+  const newTop  = cy - ly * newZoom;
+  stagePanX += newLeft - innerRect.left;
+  stagePanY += newTop  - innerRect.top;
+  stageZoom  = newZoom;
   applyStageViewTransform();
 }
 
-// Shift + スクロールでズーム
-document.querySelector('main').addEventListener('wheel', e => {
-  if (!e.shiftKey) return;
+// ステージ上のホイールでズーム（Shift 不要）
+stage.addEventListener('wheel', e => {
   e.preventDefault();
   zoomStageAt(e.deltaY, e.clientX, e.clientY);
 }, { passive: false });
 
-// 中ボタン長押しでパン
-document.addEventListener('mousedown', e => {
-  if (e.button !== 1) return;
-  e.preventDefault();
-  isMiddlePanning    = true;
-  middlePanStartX    = e.clientX;
-  middlePanStartY    = e.clientY;
-  middlePanStartPanX = stagePanX;
-  middlePanStartPanY = stagePanY;
+// ステージ背景または本体ディスプレイ余白をドラッグで移動
+let innerDragging = false;
+let innerDragStartX = 0, innerDragStartY = 0;
+let innerDragStartPanX = 0, innerDragStartPanY = 0;
+
+stage.addEventListener('mousedown', e => {
+  // 左クリックのみ。スプライト上は通常のドラッグを優先するので stage/stageInner 直接のみ
+  if (e.button !== 0) return;
+  if (e.target !== stage && e.target !== stageInner) return;
+  innerDragging = true;
+  innerDragStartX = e.clientX;
+  innerDragStartY = e.clientY;
+  innerDragStartPanX = stagePanX;
+  innerDragStartPanY = stagePanY;
   stage.classList.add('is-panning');
 });
 
 document.addEventListener('mousemove', e => {
-  if (!isMiddlePanning) return;
-  stagePanX = middlePanStartPanX + (e.clientX - middlePanStartX);
-  stagePanY = middlePanStartPanY + (e.clientY - middlePanStartY);
+  if (!innerDragging) return;
+  stagePanX = innerDragStartPanX + (e.clientX - innerDragStartX);
+  stagePanY = innerDragStartPanY + (e.clientY - innerDragStartY);
   applyStageViewTransform();
 });
 
-document.addEventListener('mouseup', e => {
-  if (e.button === 1 && isMiddlePanning) {
-    isMiddlePanning = false;
+document.addEventListener('mouseup', () => {
+  if (innerDragging) {
+    innerDragging = false;
     stage.classList.remove('is-panning');
   }
 });
+
+window.addEventListener('resize', fitInnerToStage);
 
 // ===== パネルドラッグ =====
 
@@ -392,6 +437,99 @@ function loadViewToggles() {
 function saveViewToggles(state) {
   localStorage.setItem(VIEW_STORAGE_KEY, JSON.stringify(state));
 }
+
+// ===== キャンバス設定（Shift+Ctrl+K） =====
+const CANVAS_SETTINGS_KEY = 'kamishibai_canvas_settings_v1';
+
+function applyCanvasSettings(w, h, bg) {
+  LOGICAL_W = w;
+  LOGICAL_H = h;
+  canvasBgColor = bg;
+  const root = document.documentElement.style;
+  root.setProperty('--inner-aspect', w + ' / ' + h);
+  root.setProperty('--inner-bg', bg);
+  // 本体ディスプレイを .stage 内に contain 再配置
+  stageZoom = 1.0; stagePanX = 0; stagePanY = 0;
+  try { fitInnerToStage && fitInnerToStage(); } catch (_) {}
+  try { renderRail && renderRail(); } catch (_) {}
+}
+
+function saveCanvasSettings() {
+  try {
+    localStorage.setItem(CANVAS_SETTINGS_KEY, JSON.stringify({
+      w: LOGICAL_W, h: LOGICAL_H, bg: canvasBgColor
+    }));
+  } catch (_) {}
+}
+
+function loadCanvasSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem(CANVAS_SETTINGS_KEY) || 'null');
+    if (s && s.w && s.h && s.bg) applyCanvasSettings(s.w, s.h, s.bg);
+    else applyCanvasSettings(LOGICAL_W, LOGICAL_H, canvasBgColor);
+  } catch (_) {
+    applyCanvasSettings(LOGICAL_W, LOGICAL_H, canvasBgColor);
+  }
+}
+
+function openCanvasSettings() {
+  const modal = document.getElementById('canvasSettingsModal');
+  if (!modal) return;
+  document.getElementById('canvasWidthInput').value  = LOGICAL_W;
+  document.getElementById('canvasHeightInput').value = LOGICAL_H;
+  document.getElementById('canvasBgInput').value     = canvasBgColor;
+  modal.classList.remove('usage-hidden');
+}
+
+(function initCanvasSettingsModal() {
+  const modal = document.getElementById('canvasSettingsModal');
+  if (!modal) return;
+  const closeBtn = document.getElementById('canvasSettingsCloseBtn');
+  const applyBtn = document.getElementById('canvasSettingsApplyBtn');
+  const wIn = document.getElementById('canvasWidthInput');
+  const hIn = document.getElementById('canvasHeightInput');
+  const bgIn = document.getElementById('canvasBgInput');
+  const close = () => modal.classList.add('usage-hidden');
+  closeBtn.addEventListener('click', close);
+  modal.addEventListener('click', e => { if (e.target === modal) close(); });
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !modal.classList.contains('usage-hidden')) close();
+  });
+  modal.querySelectorAll('.canvas-settings-presets button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const [w, h] = btn.dataset.preset.split('x').map(Number);
+      wIn.value = w; hIn.value = h;
+    });
+  });
+  applyBtn.addEventListener('click', () => {
+    const w = Math.max(100, Math.min(8000, parseInt(wIn.value, 10) || 1920));
+    const h = Math.max(100, Math.min(8000, parseInt(hIn.value, 10) || 1080));
+    const bg = bgIn.value || '#d6d6d6';
+    applyCanvasSettings(w, h, bg);
+    saveCanvasSettings();
+    close();
+  });
+  loadCanvasSettings();
+  requestAnimationFrame(() => fitInnerToStage());
+})();
+
+// Usage モーダル開閉
+(function initUsageModal() {
+  const btn = document.getElementById('usageBtn');
+  const modal = document.getElementById('usageModal');
+  const closeBtn = document.getElementById('usageCloseBtn');
+  if (!btn || !modal) return;
+  const open  = () => modal.classList.remove('usage-hidden');
+  const close = () => modal.classList.add('usage-hidden');
+  btn.addEventListener('click', () => {
+    modal.classList.contains('usage-hidden') ? open() : close();
+  });
+  closeBtn && closeBtn.addEventListener('click', close);
+  modal.addEventListener('click', e => { if (e.target === modal) close(); });
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !modal.classList.contains('usage-hidden')) close();
+  });
+})();
 
 (function initViewToggles() {
   const saved = loadViewToggles() || {};

@@ -45,8 +45,12 @@ async function idbLoad() {
 }
 
 // 論理座標（レイアウトの基準となる仮想キャンバス）
-const LOGICAL_W = 1080;
-const LOGICAL_H = 720;
+// デフォルト 1920x1080。Shift+Ctrl+K の設定で変更可能
+let LOGICAL_W = 1920;
+let LOGICAL_H = 1080;
+
+// ステージ背景色（Shift+Ctrl+K で変更）
+let canvasBgColor = '#d6d6d6';
 
 // サムネイルサイズ
 const THUMB_W = 200;

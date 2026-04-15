@@ -11,6 +11,7 @@ const counter   = document.getElementById('counter');
 const rail      = document.getElementById('rail');
 const stage     = document.querySelector('.stage');
 const stageInner = document.getElementById('stageInner');
+const stagePageName = document.getElementById('stagePageName');
 
 // ツールバー
 const addOneBtn     = document.getElementById('addOne');
@@ -107,12 +108,7 @@ let currentStroke = null;  // 現在の1本の線レイヤー
 let drawCanvas    = null;
 let drawCtx       = null;
 
-// ===== ズーム / パン =====
-let stageZoom         = 1.0;
-let stagePanX         = 0;
-let stagePanY         = 0;
-let isMiddlePanning   = false;
-let middlePanStartX   = 0;
-let middlePanStartY   = 0;
-let middlePanStartPanX = 0;
-let middlePanStartPanY = 0;
+// ===== 本体ディスプレイのズーム / パン =====
+let stageZoom = 1.0;
+let stagePanX = 0;
+let stagePanY = 0;

@@ -345,7 +345,7 @@ function renderStage() {
   output.style.fontSize = Number(fontSize.value) + 'px';
   editor.value          = page.text || '';
   badge.textContent     = String(idx + 1).padStart(2, '0');
-  counter.textContent   = `ページ ${idx + 1} / ${slides.length}`;
+  counter.textContent   = `Page ${idx + 1} / ${slides.length}`;
 
   clearCharLayer();
 
@@ -405,7 +405,50 @@ function drawShapeOnCtx(ctx, shape, scale, offsetX, offsetY) {
 
 // ===== サムネイルレール描画 =====
 
+function updateStagePageName() {
+  if (!stagePageName) return;
+  const page = slides[idx];
+  if (!page) { stagePageName.textContent = ''; return; }
+  stagePageName.style.display = '';
+  stagePageName.textContent = page.name || `Page ${idx + 1}`;
+}
+
+function beginStagePageNameEdit() {
+  if (!stagePageName) return;
+  const page = slides[idx];
+  if (!page) return;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'stage-page-name-input';
+  input.value = page.name || '';
+  input.placeholder = `Page ${idx + 1}`;
+  stagePageName.style.display = 'none';
+  stagePageName.parentNode.appendChild(input);
+  input.focus();
+  input.select();
+  const commit = () => {
+    page.name = input.value.trim();
+    input.remove();
+    persist();
+    updateStagePageName();
+    renderRail();
+  };
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter')  { ev.preventDefault(); input.blur(); }
+    if (ev.key === 'Escape') { input.value = page.name || ''; input.blur(); }
+  });
+}
+
+if (stagePageName) {
+  stagePageName.addEventListener('click', e => {
+    e.stopPropagation();
+    beginStagePageNameEdit();
+  });
+}
+
 function renderRail() {
+  updateStagePageName();
   rail.innerHTML = '';
 
   slides.forEach((page, i) => {
@@ -497,8 +540,8 @@ function renderRail() {
     // ページ名ラベル
     const nameEl = document.createElement('div');
     nameEl.className = 'thumb-name';
-    nameEl.textContent = page.name || `ページ ${i + 1}`;
-    nameEl.title = 'クリックで名前を編集';
+    nameEl.textContent = page.name || `Page ${i + 1}`;
+    nameEl.title = 'Click to rename';
 
     nameEl.addEventListener('click', e => {
       e.stopPropagation();
@@ -506,7 +549,7 @@ function renderRail() {
       input.type      = 'text';
       input.className = 'thumb-name-input';
       input.value     = page.name || '';
-      input.placeholder = `ページ ${i + 1}`;
+      input.placeholder = `Page ${i + 1}`;
       nameEl.replaceWith(input);
       input.focus();
       input.select();
