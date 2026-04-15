@@ -87,7 +87,7 @@ function onDrawMouseDown(e) {
 
   // Shift押下中は背景色で上書き（消しゴム風）
   const color = erasing ? '#d6d6d6' : currentColor;
-  const strokeWidth = 4; // 論理座標上の太さ
+  const strokeWidth = 10; // 論理座標上の太さ
 
   currentStroke = {
     kind: 'stroke',

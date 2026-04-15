@@ -4,14 +4,13 @@
 
 // デフォルトテンプレート
 const P5_DEFAULT_CODE = `// p. でp5.jsの関数を呼びます
-// 背景を透明にしたい場合は p.clear() を使います
 p.setup = function() {
   p.createCanvas(400, 400);
   p.noLoop();
 };
 
 p.draw = function() {
-  p.clear(); // 透明背景
+  p.clear(); // Bckgrouund transparent
   p.fill('#1e88e5');
   p.noStroke();
   p.ellipse(200, 200, 200, 200);
@@ -70,7 +69,7 @@ function runSketchToDataUrl(onSuccess, btn, runningLabel, idleLabel) {
       const dataUrl = cnv.toDataURL('image/png');
       onSuccess(dataUrl);
     } catch (captureErr) {
-      showCodeError('キャプチャエラー: ' + captureErr.message);
+      showCodeError('capture error: ' + captureErr.message);
     } finally {
       cleanup();
     }
@@ -88,7 +87,7 @@ function runSketchToDataUrl(onSuccess, btn, runningLabel, idleLabel) {
     }, container);
     setTimeout(() => { if (!captured) doCapture(); }, 800);
   } catch (err) {
-    showCodeError('コードエラー: ' + err.message);
+    showCodeError('error: ' + err.message);
     cleanup();
   }
 }
@@ -99,7 +98,7 @@ previewCodeBtn.addEventListener('click', () => {
   runSketchToDataUrl((dataUrl) => {
     codePreviewImg.src = dataUrl;
     codePreviewArea.style.display = 'block';
-  }, previewCodeBtn, 'プレビュー中…', 'プレビュー');
+  }, previewCodeBtn, 'previewing…', 'preview');
 });
 
 // 生成：ステージに追加＋プレビュー表示
@@ -110,7 +109,7 @@ generateCodeBtn.addEventListener('click', () => {
     insertImageAt(LOGICAL_W / 2, LOGICAL_H / 2, dataUrl);
     codePreviewImg.src = dataUrl;
     codePreviewArea.style.display = 'block';
-  }, generateCodeBtn, '生成中…', '生成');
+  }, generateCodeBtn, 'creating…', 'create');
 });
 
 // ===== コピーボタン =====
@@ -120,8 +119,8 @@ copyCodeBtn.addEventListener('click', () => {
   if (!text) return;
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(() => {
-      copyCodeBtn.textContent = 'コピー済み';
-      setTimeout(() => { copyCodeBtn.textContent = 'コピー'; }, 1200);
+      copyCodeBtn.textContent = 'copied';
+      setTimeout(() => { copyCodeBtn.textContent = 'copy'; }, 1200);
     }).catch(() => {
       canvasCode.select();
       document.execCommand('copy');

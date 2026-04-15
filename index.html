@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>縦書き 紙芝居エディタ（ページ対応）</title>
+  <title>ProjectH</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -14,8 +14,8 @@
   <header>
     <!-- 表示切替バー -->
     <div class="view-toggle-bar">
-      <button class="view-toggle active" type="button" data-target="toolbar-main" title="ツールバー">ツール</button>
-      <button class="view-toggle active" type="button" data-target="railWrap" title="サムネイル">サムネ</button>
+      <button class="view-toggle active" type="button" data-target="toolbar-main" title="ツールバー">Tool</button>
+      <button class="view-toggle active" type="button" data-target="railWrap" title="サムネイル">Thumbnail</button>
       <button class="view-toggle active" type="button" data-target="objectPanel" title="OBJECTSパネル">OBJ</button>
       <button class="view-toggle active" type="button" data-target="panelLayers" title="LAYERSパネル">LAYER</button>
       <button class="view-toggle active" type="button" data-target="panelCode" title="Code Spaceパネル">CODE</button>
@@ -25,24 +25,24 @@
     <div class="toolbar" id="toolbar-main">
       <div class="row">
         <label class="font-label">
-          文字サイズ
+          TextSize
           <input id="fontSize" type="number" min="12" max="200" value="64" />
           <span>px</span>
         </label>
-        <button id="rasterize">ラスタライズ</button>
-        <button id="backToText">テキストに戻す</button>
+        <button id="rasterize">Rasterize</button>
+        <button id="backToText">backToText</button>
         <span id="counter" class="page-counter"></span>
       </div>
       <div class="row">
-        <button id="addOne">+ 1ページ追加</button>
-        <button id="duplicate">ページを複製</button>
-        <button id="delete">ページを削除</button>
-        <button id="prev">◀ 前へ</button>
-        <button id="next">次へ ▶</button>
-        <button id="export">ファイルに保存</button>
-        <button id="import">ファイルを開く</button>
-        <button id="exportImage">画像として保存</button>
-        <button id="exportAllImages">画像をまとめて保存</button>
+        <button id="addOne">AddPage</button>
+        <button id="duplicate">Duplicate Page</button>
+        <button id="delete">DeletePage</button>
+        <button id="prev">◀ Previous</button>
+        <button id="next">Next ▶</button>
+        <button id="export">Save File</button>
+        <button id="import">Import</button>
+        <button id="exportImage">SaveAsPNG</button>
+        <button id="exportAllImages">SaveAll</button>
         <input id="importFile" type="file" accept=".kmshb,.json" style="display:none" />
       </div>
     </div>
@@ -90,12 +90,11 @@
           id="toolTextInput"
           class="object-text-input"
           type="text"
-          placeholder="テキスト"
+          placeholder="Text"
         />
       </div>
       <p class="object-hint">
-        Tを押すとテキストオブジェクトを追加します。<br />
-        Sキーでサイズ編集モードのON/OFFを切り替えできます。
+        KeyT/KeyS
       </p>
     </div>
 
@@ -115,9 +114,6 @@
         <span>Custom</span>
         <input id="customColor" type="color" value="#111111" />
       </div>
-      <p class="object-hint">
-        オブジェクトを選択してから色を変更すると、そのオブジェクトの色が変わります。
-      </p>
     </div>
 
     <!-- DRAW（手書きモード） -->
@@ -125,11 +121,9 @@
       <div class="object-panel-title">DRAW</div>
       <label class="draw-toggle">
         <input type="checkbox" id="drawModeToggle" />
-        <span>手書きモード</span>
+        <span>WritingMode</span>
       </label>
-      <p class="draw-hint">
-        手書きモード中：マウスドラッグで線を描画 / Shift + ドラッグで消しゴム風（背景色で上書き）。
-      </p>
+      
     </div>
 
     <!-- SNAP -->
@@ -137,12 +131,9 @@
       <div class="object-panel-title">SNAP</div>
       <label class="snap-toggle">
         <input type="checkbox" id="snapCenterToggle" />
-        <span>中央＆他オブジェクトにスナップ</span>
+        <span>Snap</span>
       </label>
-      <p class="snap-hint">
-        オブジェクトをドラッグしたとき、キャンバス中央や他のオブジェクトの中心に近づくと、
-        自動的に位置がそろいます。
-      </p>
+      
     </div>
 
     <!-- ESSAY -->
@@ -150,22 +141,20 @@
       <div class="object-panel-title">ESSAY</div>
       <div class="essay-size-row">
         <label class="essay-size-label">
-          行数
+          行
           <input id="essayRowsInput" type="number" min="5" max="50" value="50" class="essay-size-input" />
         </label>
         <label class="essay-size-label">
-          列数
+          列
           <input id="essayColsInput" type="number" min="5" max="50" value="30" class="essay-size-input" />
         </label>
       </div>
-      <button id="essayModeBtn" class="essay-open-btn" type="button">原稿用紙を開く</button>
+      <button id="essayModeBtn" class="essay-open-btn" type="button">Essay</button>
       <p class="object-hint">
-        Shift+E でモード切替 / Esc で終了<br />
-        行数・列数で原稿用紙のマス目を変更できます。
+        Shift+E/ Esc<br />
       </p>
     </div>
   </aside>
-
   <!-- ===== レイヤーパネル（右上） ===== -->
   <aside id="panelLayers" class="layers-panel">
     <div class="panel-drag-handle">LAYERS</div>
@@ -178,20 +167,19 @@
     <textarea id="canvasCode" class="code-textarea" spellcheck="false"></textarea>
     <div id="codeErrorMsg" class="code-error-msg"></div>
     <div id="codePreviewArea" class="code-preview-area">
-      <img id="codePreviewImg" class="code-preview-img" alt="プレビュー" />
+      <img id="codePreviewImg" class="code-preview-img" alt="Preview" />
     </div>
     <div class="code-btn-row">
-      <button id="previewCode" class="generate-code-btn" type="button">プレビュー</button>
-      <button id="generateCode" class="generate-code-btn" type="button">生成</button>
-      <button id="copyCode" class="copy-code-btn" type="button">コピー</button>
+      <button id="previewCode" class="generate-code-btn" type="button">Preview</button>
+      <button id="generateCode" class="generate-code-btn" type="button">Generate</button>
+      <button id="copyCode" class="copy-code-btn" type="button">Copy</button>
     </div>
   </aside>
 
   <!-- 画像挿入用（ダブルクリック時に開く） -->
   <input id="imageFile" type="file" accept="image/*" style="display:none" />
 
-  <footer id="appFooter">
-    サムネイルクリックでページジャンプ / ←→ でページ送り /
+  <footer id="appFooter"> 
     <strong>Fでページだけフルスクリーン</strong> /
     <strong>Shift+E でエッセイモード（原稿用紙）</strong> /
     <strong>Shift+スクロールでズーム / 中ボタン長押しでパン</strong> /

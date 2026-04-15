@@ -144,7 +144,7 @@ function getPageFilename(i) {
 exportBtn.addEventListener('click', async () => {
   try {
     exportBtn.disabled = true;
-    exportBtn.textContent = '保存中…';
+    exportBtn.textContent = 'Saving…';
 
     const zip = new JSZip();
     const exportSlides = JSON.parse(JSON.stringify(slides));
@@ -179,7 +179,7 @@ exportBtn.addEventListener('click', async () => {
     alert('ファイル保存に失敗しました');
   } finally {
     exportBtn.disabled = false;
-    exportBtn.textContent = 'ファイルに保存';
+    exportBtn.textContent = 'SaveProject';
   }
 });
 
@@ -232,7 +232,7 @@ importFile.addEventListener('change', async e => {
 exportImageBtn.addEventListener('click', async () => {
   try {
     exportImageBtn.disabled = true;
-    exportImageBtn.textContent = '描画中…';
+    exportImageBtn.textContent = 'drawing…';
 
     const canvas = await renderSlideToCanvas(idx);
     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
@@ -245,7 +245,7 @@ exportImageBtn.addEventListener('click', async () => {
     alert('画像の保存に失敗しました');
   } finally {
     exportImageBtn.disabled = false;
-    exportImageBtn.textContent = '画像として保存';
+    exportImageBtn.textContent = 'SaveAsPNG';
   }
 });
 
@@ -262,7 +262,7 @@ exportAllImagesBtn.addEventListener('click', async () => {
       zip.file(getPageFilename(i), blob);
     }
 
-    exportAllImagesBtn.textContent = 'zip 生成中…';
+    exportAllImagesBtn.textContent = 'zip creating…';
     const zipBlob = await zip.generateAsync({ type: 'blob' });
     await saveWithPicker(zipBlob, 'kamishibai_images.zip', [
       { description: 'ZIP アーカイブ', accept: { 'application/zip': ['.zip'] } }
@@ -272,6 +272,6 @@ exportAllImagesBtn.addEventListener('click', async () => {
     alert('まとめて保存に失敗しました');
   } finally {
     exportAllImagesBtn.disabled = false;
-    exportAllImagesBtn.textContent = '画像をまとめて保存';
+    exportAllImagesBtn.textContent = 'SaveAllPNGs';
   }
 });
