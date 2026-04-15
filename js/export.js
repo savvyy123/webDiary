@@ -44,7 +44,7 @@ async function renderSlideToCanvas(slideIndex) {
   const ctx = canvas.getContext('2d');
 
   // 背景：設定色で塗りつぶし
-  ctx.fillStyle = canvasBgColor || '#d6d6d6';
+  ctx.fillStyle = canvasBgColor || '#ffffff';
   ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
 
   const page = slides[slideIndex];

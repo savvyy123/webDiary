@@ -50,7 +50,7 @@ let LOGICAL_W = 1920;
 let LOGICAL_H = 1080;
 
 // ステージ背景色（Shift+Ctrl+K で変更）
-let canvasBgColor = '#d6d6d6';
+let canvasBgColor = '#ffffff';
 
 // サムネイルサイズ
 const THUMB_W = 200;
