@@ -25,11 +25,6 @@ const rasterizeBtn  = document.getElementById('rasterize');
 const backToTextBtn = document.getElementById('backToText');
 
 // OBJECTツール
-const shapeCircleFillBtn = document.getElementById('shapeCircleFill');
-const shapeCircleRingBtn = document.getElementById('shapeCircleRing');
-const shapeTriangleBtn   = document.getElementById('shapeTriangle');
-const shapeSquareBtn     = document.getElementById('shapeSquare');
-const shapeFullRectBtn   = document.getElementById('shapeFullRect');
 const toolTextBtn        = document.getElementById('toolTextBtn');
 const toolTextInput      = document.getElementById('toolTextInput');
 

@@ -145,41 +145,7 @@ function insertImageAt(logicX, logicY, dataUrl) {
   tmpImg.src = dataUrl;
 }
 
-// ===== 図形 / テキストボックス追加 =====
-
-function addShape(type) {
-  pushUndoState();
-
-  const page = slides[idx];
-  const raster = ensureRaster(page);
-
-  let baseW = Math.round(220 * OBJ_SIZE_SCALE);
-  let baseH = Math.round(220 * OBJ_SIZE_SCALE);
-  let logicX = LOGICAL_W / 2;
-  let logicY = LOGICAL_H / 2;
-
-  if (type === 'fullrect') {
-    baseW = LOGICAL_W;
-    baseH = LOGICAL_H;
-  }
-
-  const layer = {
-    kind: 'shape',
-    type,
-    logicX,
-    logicY,
-    baseW,
-    baseH,
-    color: currentColor,
-    locked: false
-  };
-
-  raster.layers.push(layer);
-  persist();
-  buildCharLayerFromRaster(raster);
-  renderRail();
-  updateLayerAndCodeUI();
-}
+// ===== テキストボックス追加 =====
 
 function addTextboxFromTool() {
   pushUndoState();

@@ -3,17 +3,17 @@
 // ==================================================
 
 // デフォルトテンプレート
-const P5_DEFAULT_CODE = `// p. でp5.jsの関数を呼びます
-p.setup = function() {
-  p.createCanvas(400, 400);
-  p.noLoop();
+const P5_DEFAULT_CODE = 
+`setup = function() {
+  createCanvas(400, 400);
+  noLoop();
 };
 
-p.draw = function() {
-  p.clear(); // Bckgrouund transparent
-  p.fill('#1e88e5');
-  p.noStroke();
-  p.ellipse(200, 200, 200, 200);
+draw = function() {
+  clear(); // Background transparent
+  fill('#1e88e5');
+  noStroke();
+  ellipse(200, 200, 200, 200);
 };`;
 
 canvasCode.value = P5_DEFAULT_CODE;
@@ -76,7 +76,9 @@ function runSketchToDataUrl(onSuccess, btn, runningLabel, idleLabel) {
   }
 
   try {
-    const sketchFn = new Function('p', code);
+    // with(p) で p. を省略可能にする
+    // setup/draw を先に定義しておき、with 内の代入が p に届くようにする
+    const sketchFn = new Function('p', 'p.setup=function(){};p.draw=function(){};with(p){\n' + code + '\n}');
     p5inst = new p5(function(p) {
       sketchFn(p);
       const origDraw = p.draw;

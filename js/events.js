@@ -148,13 +148,6 @@ editor.addEventListener('keydown', e => {
   }
 });
 
-// 図形ツール
-shapeCircleFillBtn.addEventListener('click', () => { enterRasterMode(); addShape('circleFill'); });
-shapeCircleRingBtn.addEventListener('click', () => { enterRasterMode(); addShape('circleRing'); });
-shapeTriangleBtn.addEventListener('click',   () => { enterRasterMode(); addShape('triangle'); });
-shapeSquareBtn.addEventListener('click',     () => { enterRasterMode(); addShape('square'); });
-shapeFullRectBtn.addEventListener('click',   () => { enterRasterMode(); addShape('fullrect'); });
-
 toolTextBtn.addEventListener('click', () => { enterRasterMode(); addTextboxFromTool(); });
 
 // カラー
