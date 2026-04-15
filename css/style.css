@@ -484,6 +484,16 @@ body.size-edit-mode .char-sprite {
   margin-bottom: 16px;
 }
 
+.object-panel-section--row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.object-panel-section--row .object-panel-title {
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+
 .object-panel-title {
   font-weight: 700;
   margin-bottom: 6px;

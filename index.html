@@ -31,9 +31,6 @@
         </label>
         <button id="rasterize">Rasterize</button>
         <button id="backToText">backToText</button>
-        <span id="counter" class="page-counter"></span>
-      </div>
-      <div class="row">
         <button id="addOne">AddPage</button>
         <button id="duplicate">Duplicate Page</button>
         <button id="delete">DeletePage</button>
@@ -79,20 +76,10 @@
     <div class="panel-drag-handle">OBJECTS</div>
 
     <!-- 図形 / テキストツール -->
-    <div class="object-panel-section">
-      <div class="object-panel-title">TOOLS</div>
-      <div class="object-tool-row">
-        <button id="toolTextBtn" class="object-tool-btn" type="button">T</button>
-        <input
-          id="toolTextInput"
-          class="object-text-input"
-          type="text"
-          placeholder="Text"
-        />
-      </div>
-      <p class="object-hint">
-        KeyT/KeyS
-      </p>
+    <div class="object-panel-section object-panel-section--row">
+      <span class="object-panel-title">TOOLS</span>
+      <button id="toolTextBtn" class="object-tool-btn" type="button">T</button>
+      <input id="toolTextInput" class="object-text-input" type="text" placeholder="Text" />
     </div>
 
     <!-- カラー -->
