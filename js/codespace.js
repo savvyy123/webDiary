@@ -33,16 +33,15 @@ function clearCodeError() {
 
 // ===== 生成ボタン：p5 スケッチ実行 → スライドに追加 =====
 
-generateCodeBtn.addEventListener('click', () => {
+// p5 スケッチを実行して dataUrl を返す共通ルーチン
+function runSketchToDataUrl(onSuccess, btn, runningLabel, idleLabel) {
   const code = canvasCode.value.trim();
   if (!code) return;
 
   clearCodeError();
-  codePreviewArea.style.display = 'none';
-  generateCodeBtn.disabled = true;
-  generateCodeBtn.textContent = '生成中…';
+  btn.disabled = true;
+  btn.textContent = runningLabel;
 
-  // p5.js 実行用の一時コンテナ（画面外）
   const container = document.createElement('div');
   container.style.cssText = 'position:fixed;left:-9999px;top:-9999px;';
   document.body.appendChild(container);
@@ -53,14 +52,13 @@ generateCodeBtn.addEventListener('click', () => {
   function cleanup() {
     if (p5inst) { try { p5inst.remove(); } catch (_) {} p5inst = null; }
     if (container.parentNode) document.body.removeChild(container);
-    generateCodeBtn.disabled = false;
-    generateCodeBtn.textContent = '生成';
+    btn.disabled = false;
+    btn.textContent = idleLabel;
   }
 
   function doCapture() {
     if (captured) return;
     captured = true;
-
     try {
       if (p5inst) p5inst.noLoop();
       const cnv = container.querySelector('canvas');
@@ -69,19 +67,8 @@ generateCodeBtn.addEventListener('click', () => {
         cleanup();
         return;
       }
-
       const dataUrl = cnv.toDataURL('image/png');
-
-      // ラスタモードでなければ切り替える
-      if (mode !== 'raster') enterRasterMode();
-
-      // 現在のスライドの中央にオブジェクトとして追加
-      insertImageAt(LOGICAL_W / 2, LOGICAL_H / 2, dataUrl);
-
-      // パネル内にプレビューを表示（追加完了の確認用）
-      codePreviewImg.src = dataUrl;
-      codePreviewArea.style.display = 'block';
-
+      onSuccess(dataUrl);
     } catch (captureErr) {
       showCodeError('キャプチャエラー: ' + captureErr.message);
     } finally {
@@ -91,26 +78,39 @@ generateCodeBtn.addEventListener('click', () => {
 
   try {
     const sketchFn = new Function('p', code);
-
     p5inst = new p5(function(p) {
       sketchFn(p);
-
-      // p.draw をラップして描画完了後にキャプチャ
       const origDraw = p.draw;
       p.draw = function() {
         if (origDraw) origDraw.call(p);
-        // 描画コンテキストを汚さないよう setTimeout(0) で非同期実行
         setTimeout(doCapture, 0);
       };
     }, container);
-
-    // draw 未定義やごく稀な遅延に備えたフォールバック
     setTimeout(() => { if (!captured) doCapture(); }, 800);
-
   } catch (err) {
     showCodeError('コードエラー: ' + err.message);
     cleanup();
   }
+}
+
+// プレビュー：パネル内に表示のみ
+previewCodeBtn.addEventListener('click', () => {
+  codePreviewArea.style.display = 'none';
+  runSketchToDataUrl((dataUrl) => {
+    codePreviewImg.src = dataUrl;
+    codePreviewArea.style.display = 'block';
+  }, previewCodeBtn, 'プレビュー中…', 'プレビュー');
+});
+
+// 生成：ステージに追加＋プレビュー表示
+generateCodeBtn.addEventListener('click', () => {
+  codePreviewArea.style.display = 'none';
+  runSketchToDataUrl((dataUrl) => {
+    if (mode !== 'raster') enterRasterMode();
+    insertImageAt(LOGICAL_W / 2, LOGICAL_H / 2, dataUrl);
+    codePreviewImg.src = dataUrl;
+    codePreviewArea.style.display = 'block';
+  }, generateCodeBtn, '生成中…', '生成');
 });
 
 // ===== コピーボタン =====

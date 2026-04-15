@@ -285,6 +285,18 @@ function applyColorToSelected(color) {
       newImg._charObj = obj;
       addSpriteEventHandlers(newImg, obj);
       oldEl.replaceWith(newImg);
+    } else if (obj.kind === 'image') {
+      if (!obj.data.origSrc) obj.data.origSrc = obj.data.src;
+      obj.data.color = color;
+      const oldEl = obj.el;
+      const newImg = createImageSprite(obj.data, (finishedImg) => {
+        obj.data.src = finishedImg.src;
+        persist();
+      });
+      obj.el = newImg;
+      newImg._charObj = obj;
+      addSpriteEventHandlers(newImg, obj);
+      oldEl.replaceWith(newImg);
     }
   });
 

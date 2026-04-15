@@ -105,6 +105,41 @@ function createShapeImage(shape) {
   return img;
 }
 
+// ===== 画像スプライト生成（色指定があれば着色） =====
+
+function createImageSprite(layer, onReady) {
+  const img = new Image();
+  img.className   = 'char-sprite';
+  img.style.width  = (layer.baseW || 200) + 'px';
+  img.style.height = (layer.baseH || 200) + 'px';
+
+  const srcOriginal = layer.origSrc || layer.src;
+
+  if (!layer.color) {
+    img.src = srcOriginal;
+    return img;
+  }
+
+  const tmp = new Image();
+  tmp.onload = () => {
+    const w = tmp.naturalWidth  || layer.baseW || 200;
+    const h = tmp.naturalHeight || layer.baseH || 200;
+    const canvas = document.createElement('canvas');
+    canvas.width  = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(tmp, 0, 0);
+    ctx.globalCompositeOperation = 'source-in';
+    ctx.fillStyle = layer.color;
+    ctx.fillRect(0, 0, w, h);
+    img.src = canvas.toDataURL('image/png');
+    if (onReady) onReady(img);
+  };
+  tmp.onerror = () => { img.src = srcOriginal; if (onReady) onReady(img); };
+  tmp.src = srcOriginal;
+  return img;
+}
+
 // ===== スプライトへのマウスイベント登録 =====
 
 function addSpriteEventHandlers(img, obj) {
@@ -146,11 +181,7 @@ function buildCharLayerFromRaster(raster) {
     let img;
     if (layer.kind === 'char')  img = createCharImage(layer);
     else if (layer.kind === 'image') {
-      img = new Image();
-      img.src           = layer.src;
-      img.className     = 'char-sprite';
-      img.style.width   = (layer.baseW || 200) + 'px';
-      img.style.height  = (layer.baseH || 200) + 'px';
+      img = createImageSprite(layer);
     } else if (layer.kind === 'shape') {
       img = createShapeImage(layer);
     }

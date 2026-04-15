@@ -46,6 +46,7 @@ const layerList       = document.getElementById('layerList');
 const canvasCode      = document.getElementById('canvasCode');
 const copyCodeBtn     = document.getElementById('copyCode');
 const generateCodeBtn = document.getElementById('generateCode');
+const previewCodeBtn  = document.getElementById('previewCode');
 const codePreviewArea = document.getElementById('codePreviewArea');
 const codePreviewImg  = document.getElementById('codePreviewImg');
 const codeErrorMsg    = document.getElementById('codeErrorMsg');
