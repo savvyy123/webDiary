@@ -311,44 +311,49 @@ function editTextboxInPlace(obj) {
   const d = obj.data;
   const { baseScale: scale, baseOffsetX: offsetX, baseOffsetY: offsetY } = getStageTransform();
 
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.className = 'textbox-inline-edit';
-  input.value = d.text || '';
+  const ta = document.createElement('textarea');
+  ta.className = 'textbox-inline-edit';
+  ta.value = d.text || '';
 
   // スプライトの位置に合わせる
   const cx = offsetX + d.logicX * scale;
   const cy = offsetY + d.logicY * scale;
   const w  = (d.baseW || 200) * scale;
-  input.style.left     = cx + 'px';
-  input.style.top      = cy + 'px';
-  input.style.width    = Math.max(80, w) + 'px';
-  input.style.fontSize = Math.max(10, (d.fontSize || 28) * scale) + 'px';
+  const h  = (d.baseH || 60) * scale;
+  ta.style.left     = cx + 'px';
+  ta.style.top      = cy + 'px';
+  ta.style.width    = Math.max(80, w) + 'px';
+  ta.style.height   = Math.max(40, h) + 'px';
+  ta.style.fontSize = Math.max(10, (d.fontSize || 28) * scale) + 'px';
 
-  stageInner.appendChild(input);
-  input.focus();
-  input.select();
+  stageInner.appendChild(ta);
+  ta.focus();
+  ta.select();
 
   function commit() {
-    const newText = input.value.trim();
+    const newText = ta.value.trim();
     if (newText && newText !== d.text) {
       pushUndoState();
       d.text = newText;
-      // サイズを再計算
+      // サイズを再計算（最長行の文字数基準）
       const fs = d.fontSize || 28;
-      d.baseW = fs * newText.length * 0.8 + 40;
+      const lines = newText.split('\n');
+      const maxLen = Math.max(...lines.map(l => l.length));
+      d.baseW = fs * maxLen * 0.8 + 40;
+      d.baseH = fs * 1.6 * lines.length;
       persist();
       buildCharLayerFromRaster(slides[idx].raster);
       renderRail();
       updateLayerAndCodeUI();
     }
-    if (input.parentNode) input.remove();
+    if (ta.parentNode) ta.remove();
   }
 
-  input.addEventListener('blur', commit);
-  input.addEventListener('keydown', ev => {
-    if (ev.key === 'Enter')  { ev.preventDefault(); input.blur(); }
-    if (ev.key === 'Escape') { input.value = d.text || ''; input.blur(); }
+  ta.addEventListener('blur', commit);
+  ta.addEventListener('keydown', ev => {
+    // Ctrl+Enter で確定、Escape でキャンセル
+    if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') { ev.preventDefault(); ta.blur(); }
+    if (ev.key === 'Escape') { ta.value = d.text || ''; ta.blur(); }
   });
 }
 
