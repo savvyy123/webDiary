@@ -119,6 +119,7 @@ function clearSelectedObj() {
 // rect / scale / offsetX / offsetY   : ズーム込みの視覚値（マウスイベント変換用）
 // baseRect / baseScale / baseOffsetX / baseOffsetY : ズームなしの基底値（スプライトCSS配置用）
 function getStageTransform() {
+  // ズーム込み（マウスイベント変換用）: stageInner の getBoundingClientRect
   const rect   = (stageInner || stage).getBoundingClientRect();
   const scaleX = rect.width  / LOGICAL_W;
   const scaleY = rect.height / LOGICAL_H;
@@ -126,12 +127,14 @@ function getStageTransform() {
   const offsetX = (rect.width  - LOGICAL_W * scale) / 2;
   const offsetY = (rect.height - LOGICAL_H * scale) / 2;
 
-  const baseRect   = stage.getBoundingClientRect();
-  const bScaleX    = baseRect.width  / LOGICAL_W;
-  const bScaleY    = baseRect.height / LOGICAL_H;
-  const baseScale  = Math.min(bScaleX, bScaleY);
-  const baseOffsetX = (baseRect.width  - LOGICAL_W * baseScale) / 2;
-  const baseOffsetY = (baseRect.height - LOGICAL_H * baseScale) / 2;
+  // スプライトCSS配置用: stageInner の CSS レイアウトサイズ（transform 前）
+  const innerEl = stageInner || stage;
+  const baseW   = innerEl.offsetWidth;
+  const baseH   = innerEl.offsetHeight;
+  const baseScale   = Math.min(baseW / LOGICAL_W, baseH / LOGICAL_H);
+  const baseOffsetX = (baseW - LOGICAL_W * baseScale) / 2;
+  const baseOffsetY = (baseH - LOGICAL_H * baseScale) / 2;
+  const baseRect    = { left: 0, top: 0, width: baseW, height: baseH };
 
   return { rect, scale, offsetX, offsetY, baseRect, baseScale, baseOffsetX, baseOffsetY };
 }
