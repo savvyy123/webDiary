@@ -505,6 +505,8 @@ body.size-edit-mode .char-sprite {
 .object-panel {
   left: 16px;
   top: 80px;
+  overflow: visible;
+  max-height: none;
 }
 
 .object-panel-section {
