@@ -18,8 +18,9 @@
       <button class="view-toggle active" type="button" data-target="railWrap" title="サムネイル">Thumbnail</button>
       <button class="view-toggle active" type="button" data-target="objectPanel" title="OBJECTSパネル">OBJ</button>
       <button class="view-toggle active" type="button" data-target="panelLayers" title="LAYERSパネル">LAYER</button>
-      <button class="view-toggle active" type="button" data-target="panelCode" title="Code Spaceパネル">CODE</button>
-      <button id="usageBtn" type="button" title="ショートカット一覧">Usage</button>
+      <button class="view-toggle active" type="button" data-target="panelCode" title="CodeSpacePanel">CODE</button>
+      <button class="view-toggle" type="button" data-target="panelCanvasSettings" title="CanvasSettings">CANVAS</button>
+      <button id="usageBtn" type="button" title="Shortcuts">Usage</button>
     </div>
 
     <div class="toolbar" id="toolbar-main">
@@ -181,39 +182,34 @@
     <img id="fullscreenImg" alt="" />
   </div>
 
-  <!-- ===== キャンバス設定モーダル（Shift+Ctrl+K） ===== -->
-  <div id="canvasSettingsModal" class="usage-hidden">
-    <div class="usage-modal-content">
-      <div class="usage-modal-header">
-        <h3>CanvasSettings</h3>
-        <button id="canvasSettingsCloseBtn" type="button" aria-label="Close">×</button>
+  <!-- ===== CanvasSettings パネル ===== -->
+  <aside id="panelCanvasSettings" class="settings-panel">
+    <div class="panel-drag-handle">CanvasSettings</div>
+    <div class="canvas-settings-body">
+      <label class="canvas-settings-row">
+        <span>BgColor</span>
+        <input id="canvasBgInput" type="color" value="#d6d6d6" />
+      </label>
+      <label class="canvas-settings-row">
+        <span>Width</span>
+        <input id="canvasWidthInput" type="number" min="100" max="8000" step="1" value="1920" />
+      </label>
+      <label class="canvas-settings-row">
+        <span>Height</span>
+        <input id="canvasHeightInput" type="number" min="100" max="8000" step="1" value="1080" />
+      </label>
+      <div class="canvas-settings-presets">
+        <button type="button" data-preset="1920x1080">1920×1080</button>
+        <button type="button" data-preset="1280x720">1280×720</button>
+        <button type="button" data-preset="1080x720">1080×720</button>
+        <button type="button" data-preset="1080x1080">1080×1080</button>
+        <button type="button" data-preset="1080x1920">1080×1920</button>
       </div>
-      <div class="canvas-settings-body">
-        <label class="canvas-settings-row">
-          <span>BackgroundColor</span>
-          <input id="canvasBgInput" type="color" value="#d6d6d6" />
-        </label>
-        <label class="canvas-settings-row">
-          <span>Width</span>
-          <input id="canvasWidthInput" type="number" min="100" max="8000" step="1" value="1920" />
-        </label>
-        <label class="canvas-settings-row">
-          <span>Height</span>
-          <input id="canvasHeightInput" type="number" min="100" max="8000" step="1" value="1080" />
-        </label>
-        <div class="canvas-settings-presets">
-          <button type="button" data-preset="1920x1080">1920×1080</button>
-          <button type="button" data-preset="1280x720">1280×720</button>
-          <button type="button" data-preset="1080x720">1080×720</button>
-          <button type="button" data-preset="1080x1080">1080×1080</button>
-          <button type="button" data-preset="1080x1920">1080×1920</button>
-        </div>
-        <div class="canvas-settings-actions">
-          <button id="canvasSettingsApplyBtn" type="button">Apply</button>
-        </div>
+      <div class="canvas-settings-actions">
+        <button id="canvasSettingsApplyBtn" type="button">Apply</button>
       </div>
     </div>
-  </div>
+  </aside>
 
   <!-- ===== Usage（ショートカット一覧）モーダル ===== -->
   <div id="usageModal" class="usage-hidden">
@@ -230,6 +226,8 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Undo</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Redo</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>K</kbd></td><td>CanvasSettings</td></tr>
+          <tr><td><kbd>D</kbd></td><td>DuplicateSelected</td></tr>
+          <tr><td><kbd>R</kbd></td><td>RotateSelected</td></tr>
           <tr><td><kbd>Enter</kbd></td><td>EditSelected</td></tr>
           <tr><td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td><td>DeleteSelected</td></tr>
           <tr><td><kbd>←</kbd> / <kbd>PageUp</kbd></td><td>PrevPage</td></tr>
@@ -238,6 +236,7 @@
           <tr><td>Wheel</td><td>DisplayZoom</td></tr>
           <tr><td>Drag</td><td>DisplayMove</td></tr>
           <tr><td><kbd>Shift</kbd>+Draw</td><td>Erase</td></tr>
+          <tr><td>PanelEdgeDrag</td><td>PanelResize</td></tr>
         </tbody>
       </table>
     </div>

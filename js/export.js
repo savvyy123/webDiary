@@ -54,6 +54,14 @@ async function renderSlideToCanvas(slideIndex) {
   if (layers.length > 0) {
     // ラスタライズ済み：全レイヤーを描画
     for (const layer of layers) {
+      // 回転対応: レイヤーに rotation があれば ctx を回転
+      const rot = layer.rotation || 0;
+      if (rot) {
+        ctx.save();
+        ctx.translate(layer.logicX || 0, layer.logicY || 0);
+        ctx.rotate(rot * Math.PI / 180);
+        ctx.translate(-(layer.logicX || 0), -(layer.logicY || 0));
+      }
       if (layer.kind === 'char') {
         ctx.fillStyle = layer.color || getInkColor();
         ctx.font = `${layer.baseSize}px "Noto Sans JP", system-ui, sans-serif`;
@@ -84,6 +92,7 @@ async function renderSlideToCanvas(slideIndex) {
           ctx.stroke();
         }
       }
+      if (rot) ctx.restore();
     }
   } else if (page.essayText) {
     // エッセイモード：原稿用紙をレンダリング

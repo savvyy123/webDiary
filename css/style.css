@@ -446,32 +446,59 @@ body.size-edit-mode .char-sprite {
 
 .object-panel,
 .layers-panel,
-.code-panel {
+.code-panel,
+.settings-panel {
   position: fixed;
   background: #ffffffee;
   border-radius: 14px;
   border: 1px solid #0002;
   box-shadow: 0 5px 18px #00000026;
-  padding: 12px;
+  padding: var(--p-pad, 12px);
   width: 260px;
   max-height: 70vh;
   overflow: auto;
   z-index: 50;
+  min-width: 120px;
+  --p-gap: 6px;
+  --p-pad: 12px;
+  --p-margin: 16px;
+  --p-sec: 10px;
 }
 
 .panel-drag-handle {
   width: 100%;
   background: #f2f2f2;
-  padding: 6px 10px;
+  padding: var(--p-gap, 6px) 10px;
   border-radius: 8px;
   cursor: grab;
   font-weight: 700;
-  margin-bottom: 10px;
+  margin-bottom: var(--p-sec, 10px);
   font-size: 14px;
 }
 
 .panel-drag-handle:active {
   cursor: grabbing;
+}
+
+/* パネルリサイズハンドル */
+.panel-resize {
+  position: absolute;
+  z-index: 51;
+}
+.panel-resize-r {
+  right: 0; top: 0; bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+}
+.panel-resize-b {
+  bottom: 0; left: 0; right: 0;
+  height: 6px;
+  cursor: ns-resize;
+}
+.panel-resize-rb {
+  right: 0; bottom: 0;
+  width: 14px; height: 14px;
+  cursor: nwse-resize;
 }
 
 /* ===== OBJECT PANEL ===== */
@@ -481,7 +508,7 @@ body.size-edit-mode .char-sprite {
 }
 
 .object-panel-section {
-  margin-bottom: 16px;
+  margin-bottom: var(--p-margin, 16px);
 }
 
 .object-panel-title {
@@ -492,8 +519,9 @@ body.size-edit-mode .char-sprite {
 
 .object-tool-row {
   display: flex;
-  gap: 6px;
-  margin-bottom: 6px;
+  flex-wrap: wrap;
+  gap: var(--p-gap, 6px);
+  margin-bottom: var(--p-gap, 6px);
 }
 
 .object-tool-btn {
@@ -523,8 +551,8 @@ body.size-edit-mode .char-sprite {
 .color-palette {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 6px;
+  gap: var(--p-gap, 6px);
+  margin-bottom: var(--p-gap, 6px);
 }
 
 .color-swatch {
@@ -542,9 +570,9 @@ body.size-edit-mode .char-sprite {
 .color-custom-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--p-gap, 6px);
   font-size: 12px;
-  margin-bottom: 4px;
+  margin-bottom: var(--p-gap, 4px);
 }
 
 .color-custom-row input[type="color"] {
@@ -559,9 +587,9 @@ body.size-edit-mode .char-sprite {
 .draw-toggle {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--p-gap, 6px);
   font-size: 12px;
-  margin-bottom: 4px;
+  margin-bottom: var(--p-gap, 4px);
 }
 
 .draw-toggle input[type="checkbox"] {
@@ -580,9 +608,9 @@ body.size-edit-mode .char-sprite {
 .snap-toggle {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--p-gap, 6px);
   font-size: 12px;
-  margin-bottom: 4px;
+  margin-bottom: var(--p-gap, 4px);
 }
 
 .snap-toggle input[type="checkbox"] {
@@ -614,8 +642,8 @@ body.size-edit-mode .char-sprite {
   background: #fff;
   border: 1px solid #0002;
   border-radius: 8px;
-  padding: 6px;
-  margin-bottom: 8px;
+  padding: var(--p-gap, 6px);
+  margin-bottom: var(--p-gap, 8px);
   cursor: pointer;
 }
 
@@ -652,6 +680,13 @@ body.size-edit-mode .char-sprite {
   font-size: 11px;
   opacity: .7;
   margin-top: 4px;
+}
+
+/* ===== SETTINGS PANEL ===== */
+.settings-panel {
+  left: 16px;
+  bottom: 16px;
+  width: 240px;
 }
 
 /* ===== CODE PANEL ===== */
@@ -715,8 +750,9 @@ body.size-edit-mode .char-sprite {
 /* ボタン行 */
 .code-btn-row {
   display: flex;
-  gap: 6px;
-  margin-top: 8px;
+  flex-wrap: wrap;
+  gap: var(--p-gap, 6px);
+  margin-top: var(--p-gap, 8px);
 }
 
 .generate-code-btn {
@@ -792,17 +828,20 @@ body.size-edit-mode .char-sprite {
 .canvas-settings-body {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--p-sec, 10px);
   font-size: 13px;
 }
 .canvas-settings-row {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: var(--p-gap, 8px);
 }
 .canvas-settings-row input[type="number"] {
-  width: 100px;
+  width: 80px;
+  min-width: 60px;
+  flex: 1;
   padding: 4px 6px;
 }
 .canvas-settings-row input[type="color"] {
@@ -815,7 +854,7 @@ body.size-edit-mode .char-sprite {
 .canvas-settings-presets {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--p-gap, 6px);
 }
 .canvas-settings-presets button {
   padding: 4px 10px;
@@ -850,6 +889,25 @@ body.size-edit-mode .char-sprite {
   font-size: 12px;
 }
 
+/* ===== 回転角度入力 ===== */
+.rotate-angle-input {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10000;
+  width: 100px;
+  padding: 8px 12px;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  border: 2px solid #111;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  outline: none;
+}
+
 /* =========================================
    レスポンシブ
 ========================================= */
@@ -858,7 +916,8 @@ body.size-edit-mode .char-sprite {
 @media (max-width: 1200px) {
   .object-panel,
   .layers-panel,
-  .code-panel {
+  .code-panel,
+  .settings-panel {
     width: 220px;
     padding: 10px;
   }
@@ -919,7 +978,8 @@ body.size-edit-mode .char-sprite {
   /* パネル：画面下部にオーバーレイ、折りたたみ可能 */
   .object-panel,
   .layers-panel,
-  .code-panel {
+  .code-panel,
+  .settings-panel {
     position: fixed;
     left: 8px !important;
     right: 8px !important;
@@ -934,7 +994,8 @@ body.size-edit-mode .char-sprite {
 
   .object-panel.panel-open,
   .layers-panel.panel-open,
-  .code-panel.panel-open {
+  .code-panel.panel-open,
+  .settings-panel.panel-open {
     transform: translateY(0);
   }
 
@@ -1068,7 +1129,8 @@ body.mac .view-toggle-bar {
 
 body.mac .object-panel,
 body.mac .layers-panel,
-body.mac .code-panel {
+body.mac .code-panel,
+body.mac .settings-panel {
   zoom: 0.85;
 }
 

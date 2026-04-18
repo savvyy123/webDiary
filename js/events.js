@@ -232,6 +232,20 @@ window.addEventListener('keydown', e => {
 
   if (isInput || isEditable) return;
 
+  // D: 選択中オブジェクトを複製
+  if ((e.key === 'd' || e.key === 'D') && selectedSet.length && mode === 'raster') {
+    e.preventDefault();
+    duplicateSelected();
+    return;
+  }
+
+  // R: 選択中オブジェクトを回転
+  if ((e.key === 'r' || e.key === 'R') && selectedSet.length && mode === 'raster') {
+    e.preventDefault();
+    startRotateMode();
+    return;
+  }
+
   if (e.key === 'ArrowRight' || e.key === 'PageDown') next();
   if (e.key === 'ArrowLeft'  || e.key === 'PageUp')   prev();
 
@@ -389,11 +403,12 @@ function makePanelDraggable(panel) {
   if (!handle) return;
 
   let offsetX = 0, offsetY = 0, panelZoom = 1, dragging = false;
+  let panelScale = 1;
 
   // 小画面：タップで開閉
   handle.addEventListener('click', () => {
     if (!isMobileLayout()) return;
-    document.querySelectorAll('.object-panel, .layers-panel, .code-panel').forEach(p => {
+    document.querySelectorAll('.object-panel, .layers-panel, .code-panel, .settings-panel').forEach(p => {
       if (p !== panel) p.classList.remove('panel-open');
     });
     panel.classList.toggle('panel-open');
@@ -403,18 +418,16 @@ function makePanelDraggable(panel) {
     if (isMobileLayout()) return;
     dragging = true;
     const rect = panel.getBoundingClientRect();
-    // CSS zoom（body.mac でパネルが縮小）を検出
     panelZoom = rect.width / (panel.offsetWidth || rect.width) || 1;
     offsetX = e.clientX - rect.left;
     offsetY = e.clientY - rect.top;
     handle.style.cursor = 'grabbing';
-    panel.style.bottom = 'auto'; // bottom 固定を解除
+    panel.style.bottom = 'auto';
     e.preventDefault();
   });
 
   document.addEventListener('mousemove', e => {
     if (!dragging) return;
-    // ビューポートpx → レイアウトpx に変換
     panel.style.left = `${(e.clientX - offsetX) / panelZoom}px`;
     panel.style.top  = `${(e.clientY - offsetY) / panelZoom}px`;
   });
@@ -423,6 +436,55 @@ function makePanelDraggable(panel) {
     dragging = false;
     handle.style.cursor = 'grab';
   });
+
+  // リサイズハンドル（右辺・下辺・右下角）
+  // width/height を直接変え、中のflex-wrapが自然にリフローする
+  const resizeR = document.createElement('div');
+  resizeR.className = 'panel-resize panel-resize-r';
+  const resizeB = document.createElement('div');
+  resizeB.className = 'panel-resize panel-resize-b';
+  const resizeRB = document.createElement('div');
+  resizeRB.className = 'panel-resize panel-resize-rb';
+  panel.appendChild(resizeR);
+  panel.appendChild(resizeB);
+  panel.appendChild(resizeRB);
+
+  // パネル幅に応じてgap/padding/marginをCSS変数で調整
+  function updatePanelDensity() {
+    const w = panel.offsetWidth;
+    // 基準幅260pxで比率を算出（0.4〜1.5の範囲）
+    const ratio = Math.min(1.5, Math.max(0.4, w / 260));
+    panel.style.setProperty('--p-gap',    Math.round(6  * ratio) + 'px');
+    panel.style.setProperty('--p-pad',    Math.round(12 * ratio) + 'px');
+    panel.style.setProperty('--p-margin', Math.round(16 * ratio) + 'px');
+    panel.style.setProperty('--p-sec',    Math.round(10 * ratio) + 'px');
+  }
+
+  function initResize(e, dirX, dirY) {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startW = panel.offsetWidth;
+    const startH = panel.offsetHeight;
+    panel.style.bottom = 'auto';
+
+    function onMove(ev) {
+      if (dirX) panel.style.width  = Math.max(120, startW + (ev.clientX - startX) / panelZoom) + 'px';
+      if (dirY) { panel.style.height = Math.max(80, startH + (ev.clientY - startY) / panelZoom) + 'px'; panel.style.maxHeight = 'none'; }
+      updatePanelDensity();
+    }
+    function onUp() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }
+
+  resizeR.addEventListener('mousedown',  e => initResize(e, true, false));
+  resizeB.addEventListener('mousedown',  e => initResize(e, false, true));
+  resizeRB.addEventListener('mousedown', e => initResize(e, true, true));
 }
 
 // ===== 表示切替バー =====
@@ -473,29 +535,22 @@ function loadCanvasSettings() {
 }
 
 function openCanvasSettings() {
-  const modal = document.getElementById('canvasSettingsModal');
-  if (!modal) return;
+  const panel = document.getElementById('panelCanvasSettings');
+  if (!panel) return;
   document.getElementById('canvasWidthInput').value  = LOGICAL_W;
   document.getElementById('canvasHeightInput').value = LOGICAL_H;
   document.getElementById('canvasBgInput').value     = canvasBgColor;
-  modal.classList.remove('usage-hidden');
+  panel.classList.remove('panel-hidden');
 }
 
-(function initCanvasSettingsModal() {
-  const modal = document.getElementById('canvasSettingsModal');
-  if (!modal) return;
-  const closeBtn = document.getElementById('canvasSettingsCloseBtn');
+(function initCanvasSettingsPanel() {
+  const panel = document.getElementById('panelCanvasSettings');
+  if (!panel) return;
   const applyBtn = document.getElementById('canvasSettingsApplyBtn');
   const wIn = document.getElementById('canvasWidthInput');
   const hIn = document.getElementById('canvasHeightInput');
   const bgIn = document.getElementById('canvasBgInput');
-  const close = () => modal.classList.add('usage-hidden');
-  closeBtn.addEventListener('click', close);
-  modal.addEventListener('click', e => { if (e.target === modal) close(); });
-  window.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && !modal.classList.contains('usage-hidden')) close();
-  });
-  modal.querySelectorAll('.canvas-settings-presets button').forEach(btn => {
+  panel.querySelectorAll('.canvas-settings-presets button').forEach(btn => {
     btn.addEventListener('click', () => {
       const [w, h] = btn.dataset.preset.split('x').map(Number);
       wIn.value = w; hIn.value = h;
@@ -507,7 +562,6 @@ function openCanvasSettings() {
     const bg = bgIn.value || '#d6d6d6';
     applyCanvasSettings(w, h, bg);
     saveCanvasSettings();
-    close();
   });
   loadCanvasSettings();
   requestAnimationFrame(() => fitInnerToStage());
@@ -536,7 +590,7 @@ function openCanvasSettings() {
   document.querySelectorAll('.view-toggle').forEach(btn => {
     const el = document.getElementById(btn.dataset.target);
     if (!el) return;
-    if (saved[btn.dataset.target] === false) {
+    if (saved[btn.dataset.target] === false || (!btn.classList.contains('active') && saved[btn.dataset.target] !== true)) {
       el.classList.add('panel-hidden');
       btn.classList.remove('active');
     }
@@ -561,3 +615,4 @@ function openCanvasSettings() {
 makePanelDraggable(document.getElementById('objectPanel'));
 makePanelDraggable(document.getElementById('panelLayers'));
 makePanelDraggable(document.getElementById('panelCode'));
+makePanelDraggable(document.getElementById('panelCanvasSettings'));

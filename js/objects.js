@@ -145,6 +145,131 @@ function insertImageAt(logicX, logicY, dataUrl) {
   tmpImg.src = dataUrl;
 }
 
+// ===== 回転（Rキー） =====
+// Rキーで回転モードに入る。マウス移動で回転、数値入力で角度指定。
+
+let rotateMode = false;
+let rotateStartAngle = 0;
+let rotateStartRots = [];
+let rotateInput = null;
+
+function startRotateMode() {
+  if (!selectedSet.length || mode !== 'raster') return;
+  rotateMode = true;
+  pushUndoState();
+  // 各オブジェクトの現在の回転を記録
+  rotateStartRots = selectedSet.map(obj => obj.data.rotation || 0);
+  // 数値入力用フィールドを作成
+  rotateInput = document.createElement('input');
+  rotateInput.type = 'number';
+  rotateInput.className = 'rotate-angle-input';
+  rotateInput.placeholder = '0°';
+  rotateInput.value = '';
+  document.body.appendChild(rotateInput);
+  rotateInput.focus();
+
+  // 基準角度: マウス位置と選択中心の角度
+  const center = getSelectedCenter();
+  rotateStartAngle = null; // マウス移動時に初期化
+
+  function onMouseMove(e) {
+    const dx = e.clientX - center.sx;
+    const dy = e.clientY - center.sy;
+    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+    if (rotateStartAngle === null) rotateStartAngle = angle;
+    const delta = angle - rotateStartAngle;
+    applyRotation(delta);
+    rotateInput.value = Math.round(delta);
+  }
+
+  function applyRotation(delta) {
+    selectedSet.forEach((obj, i) => {
+      obj.data.rotation = (rotateStartRots[i] + delta) % 360;
+    });
+    updateSpritePositions();
+  }
+
+  function commitRotate() {
+    rotateMode = false;
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mousedown', onClickFinish);
+    document.removeEventListener('keydown', onKey);
+    if (rotateInput && rotateInput.parentNode) rotateInput.remove();
+    rotateInput = null;
+    persist();
+    renderRail();
+    updateLayerAndCodeUI();
+  }
+
+  function onClickFinish(e) {
+    if (e.target === rotateInput) return;
+    commitRotate();
+  }
+
+  function onKey(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const val = parseFloat(rotateInput.value) || 0;
+      applyRotation(val - (rotateStartRots[0] || 0) + (rotateStartRots[0] || 0));
+      selectedSet.forEach((obj, i) => {
+        obj.data.rotation = (rotateStartRots[i] + val) % 360;
+      });
+      updateSpritePositions();
+      commitRotate();
+    }
+    if (e.key === 'Escape') {
+      // キャンセル: 元に戻す
+      selectedSet.forEach((obj, i) => {
+        obj.data.rotation = rotateStartRots[i];
+      });
+      updateSpritePositions();
+      commitRotate();
+      undo();
+    }
+  }
+
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mousedown', onClickFinish);
+  document.addEventListener('keydown', onKey);
+}
+
+function getSelectedCenter() {
+  let sumX = 0, sumY = 0;
+  selectedSet.forEach(obj => {
+    sumX += obj.data.logicX || 0;
+    sumY += obj.data.logicY || 0;
+  });
+  const lx = sumX / selectedSet.length;
+  const ly = sumY / selectedSet.length;
+  const { baseScale: scale, baseOffsetX: offsetX, baseOffsetY: offsetY, baseRect } = getStageTransform();
+  return {
+    lx, ly,
+    sx: baseRect.left + offsetX + lx * scale,
+    sy: baseRect.top  + offsetY + ly * scale
+  };
+}
+
+// ===== オブジェクト複製（Dキー） =====
+
+function duplicateSelected() {
+  if (!selectedSet.length || mode !== 'raster') return;
+  pushUndoState();
+  const page = slides[idx];
+  const raster = ensureRaster(page);
+  const offset = 30; // 複製先のずらし量
+  selectedSet.forEach(obj => {
+    const clone = JSON.parse(JSON.stringify(obj.data));
+    clone.logicX = (clone.logicX || 0) + offset;
+    clone.logicY = (clone.logicY || 0) + offset;
+    clone.locked = false;
+    raster.layers.push(clone);
+  });
+  persist();
+  buildCharLayerFromRaster(raster);
+  renderRail();
+  updateLayerAndCodeUI();
+}
+
 // ===== テキストボックス追加 =====
 
 function addTextboxFromTool() {

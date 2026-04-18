@@ -23,6 +23,8 @@ function updateSpritePositions() {
       obj.el.style.width  = `${(d.baseW || 0) * scale}px`;
       obj.el.style.height = `${(d.baseH || 0) * scale}px`;
     }
+    // 回転
+    obj.el.style.transform = d.rotation ? `translate(-50%, -50%) rotate(${d.rotation}deg)` : 'translate(-50%, -50%)';
   });
 }
 

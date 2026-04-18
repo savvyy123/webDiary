@@ -18,6 +18,17 @@ draw = function() {
 
 canvasCode.value = P5_DEFAULT_CODE;
 
+// Tab キーでインデント挿入（フォーカス移動を防ぐ）
+canvasCode.addEventListener('keydown', e => {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const start = canvasCode.selectionStart;
+    const end   = canvasCode.selectionEnd;
+    canvasCode.value = canvasCode.value.substring(0, start) + '  ' + canvasCode.value.substring(end);
+    canvasCode.selectionStart = canvasCode.selectionEnd = start + 2;
+  }
+});
+
 // ===== エラー表示ヘルパー =====
 
 function showCodeError(msg) {
