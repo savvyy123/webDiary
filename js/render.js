@@ -347,7 +347,6 @@ function renderStage() {
   output.style.fontSize = Number(fontSize.value) + 'px';
   editor.value          = page.text || '';
   badge.textContent     = String(idx + 1).padStart(2, '0');
-  counter.textContent   = `Page ${idx + 1} / ${slides.length}`;
 
   clearCharLayer();
 

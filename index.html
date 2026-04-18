@@ -32,9 +32,6 @@
         </label>
         <button id="rasterize">Rasterize</button>
         <button id="backToText">backToText</button>
-        <span id="counter" class="page-counter"></span>
-      </div>
-      <div class="row">
         <button id="addOne">AddPage</button>
         <button id="duplicate">Duplicate Page</button>
         <button id="delete">DeletePage</button>
@@ -80,20 +77,10 @@
     <div class="panel-drag-handle">OBJECTS</div>
 
     <!-- 図形 / テキストツール -->
-    <div class="object-panel-section">
-      <div class="object-panel-title">TOOLS</div>
-      <div class="object-tool-row">
-        <button id="toolTextBtn" class="object-tool-btn" type="button">T</button>
-        <input
-          id="toolTextInput"
-          class="object-text-input"
-          type="text"
-          placeholder="Text"
-        />
-      </div>
-      <p class="object-hint">
-        KeyT/KeyS
-      </p>
+    <div class="object-panel-section object-panel-section--row">
+      <span class="object-panel-title">TOOLS</span>
+      <button id="toolTextBtn" class="object-tool-btn" type="button">T</button>
+      <input id="toolTextInput" class="object-text-input" type="text" placeholder="Text" />
     </div>
 
     <!-- カラー -->
@@ -205,8 +192,34 @@
         <button type="button" data-preset="1080x1080">1080×1080</button>
         <button type="button" data-preset="1080x1920">1080×1920</button>
       </div>
+<<<<<<< HEAD
       <div class="canvas-settings-actions">
         <button id="canvasSettingsApplyBtn" type="button">Apply</button>
+=======
+      <div class="canvas-settings-body">
+        <label class="canvas-settings-row">
+          <span>BackgroundColor</span>
+          <input id="canvasBgInput" type="color" value="#ffffff" />
+        </label>
+        <label class="canvas-settings-row">
+          <span>Width</span>
+          <input id="canvasWidthInput" type="number" min="100" max="8000" step="1" value="1920" />
+        </label>
+        <label class="canvas-settings-row">
+          <span>Height</span>
+          <input id="canvasHeightInput" type="number" min="100" max="8000" step="1" value="1080" />
+        </label>
+        <div class="canvas-settings-presets">
+          <button type="button" data-preset="1920x1080">1920×1080</button>
+          <button type="button" data-preset="1280x720">1280×720</button>
+          <button type="button" data-preset="1080x720">1080×720</button>
+          <button type="button" data-preset="1080x1080">1080×1080</button>
+          <button type="button" data-preset="1080x1920">1080×1920</button>
+        </div>
+        <div class="canvas-settings-actions">
+          <button id="canvasSettingsApplyBtn" type="button">Apply</button>
+        </div>
+>>>>>>> f4697b1e755e640b4fa41c47da916d47628feda3
       </div>
     </div>
   </aside>

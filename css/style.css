@@ -511,6 +511,16 @@ body.size-edit-mode .char-sprite {
   margin-bottom: var(--p-margin, 16px);
 }
 
+.object-panel-section--row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.object-panel-section--row .object-panel-title {
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+
 .object-panel-title {
   font-weight: 700;
   margin-bottom: 6px;
@@ -785,6 +795,16 @@ body.size-edit-mode .char-sprite {
   z-index: 9999;
 }
 #usageModal.usage-hidden { display: none; }
+#canvasSettingsModal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+#canvasSettingsModal.usage-hidden { display: none; }
 .usage-modal-content {
   background: #fff;
   border-radius: 8px;
