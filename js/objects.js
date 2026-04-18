@@ -305,6 +305,53 @@ function addTextboxFromTool() {
   updateLayerAndCodeUI();
 }
 
+// ダブルクリックで textbox のテキストをインライン編集
+function editTextboxInPlace(obj) {
+  if (!obj || obj.kind !== 'shape' || obj.data.type !== 'textbox') return;
+  const d = obj.data;
+  const { baseScale: scale, baseOffsetX: offsetX, baseOffsetY: offsetY } = getStageTransform();
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'textbox-inline-edit';
+  input.value = d.text || '';
+
+  // スプライトの位置に合わせる
+  const cx = offsetX + d.logicX * scale;
+  const cy = offsetY + d.logicY * scale;
+  const w  = (d.baseW || 200) * scale;
+  input.style.left     = cx + 'px';
+  input.style.top      = cy + 'px';
+  input.style.width    = Math.max(80, w) + 'px';
+  input.style.fontSize = Math.max(10, (d.fontSize || 28) * scale) + 'px';
+
+  stageInner.appendChild(input);
+  input.focus();
+  input.select();
+
+  function commit() {
+    const newText = input.value.trim();
+    if (newText && newText !== d.text) {
+      pushUndoState();
+      d.text = newText;
+      // サイズを再計算
+      const fs = d.fontSize || 28;
+      d.baseW = fs * newText.length * 0.8 + 40;
+      persist();
+      buildCharLayerFromRaster(slides[idx].raster);
+      renderRail();
+      updateLayerAndCodeUI();
+    }
+    if (input.parentNode) input.remove();
+  }
+
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter')  { ev.preventDefault(); input.blur(); }
+    if (ev.key === 'Escape') { input.value = d.text || ''; input.blur(); }
+  });
+}
+
 // 選択中の textbox を一文字ずつ char にバラす
 function rasterizeSelectedTextbox() {
   const tbObj = selectedSet.length === 1 ? selectedSet[0] : null;

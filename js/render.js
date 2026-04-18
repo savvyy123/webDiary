@@ -168,6 +168,15 @@ function addSpriteEventHandlers(img, obj) {
       dragStartLogicY  = obj.data.logicY;
     }
   });
+
+  // ダブルクリック: textbox のテキスト編集
+  img.addEventListener('dblclick', e => {
+    if (mode !== 'raster') return;
+    if (obj.kind !== 'shape' || obj.data.type !== 'textbox') return;
+    e.stopPropagation();
+    e.preventDefault();
+    editTextboxInPlace(obj);
+  });
 }
 
 // ===== ラスタレイヤーをDOMに構築 =====
